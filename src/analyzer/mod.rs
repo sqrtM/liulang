@@ -39,7 +39,7 @@ impl Debug for Node {
     }
 }
 
-pub fn expressionize(tokens: std::vec::Vec<TokenData>) -> Rc<Node> {
+pub fn expressionize(tokens: &Vec<TokenData>) -> Option<Rc<Node>> {
     let mut current_node: Option<Rc<Node>> = None;
     let mut depth = 0;
 
@@ -80,6 +80,5 @@ pub fn expressionize(tokens: std::vec::Vec<TokenData>) -> Rc<Node> {
             Token::TokenizationError(_) => todo!(),
         }
     }
-
-    current_node.expect("Why")
+    if depth != 0 { None } else { current_node }
 }

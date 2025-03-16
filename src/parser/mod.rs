@@ -133,10 +133,6 @@ impl<'a> LineToParse<'a> {
     }
 }
 
-fn token_should_end(left_char: char, right_char: char) -> bool {
-    right_char.is_whitespace() || matches!(left_char, '(' | ')') || matches!(right_char, '(' | ')')
-}
-
 impl<'a> Iterator for LineToParse<'a> {
     type Item = (&'a str, usize);
 
@@ -157,4 +153,8 @@ impl<'a> Iterator for LineToParse<'a> {
             Some((before.trim(), self.line.len()))
         }
     }
+}
+
+fn token_should_end(left_char: char, right_char: char) -> bool {
+    right_char.is_whitespace() || matches!(left_char, '(' | ')') || matches!(right_char, '(' | ')')
 }
