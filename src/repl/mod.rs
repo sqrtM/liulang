@@ -8,7 +8,7 @@ use crate::{
     parser::{self, TokenData},
 };
 
-pub fn evaluate() -> Rc<analyzer::Node> {
+pub fn evaluate() -> Vec<Rc<Node>> {
     init_terminal();
     expressionize_input(Vec::new())
 }
@@ -33,13 +33,13 @@ fn handle_input() -> String {
     input
 }
 
-fn expressionize_input(mut tokens: Vec<TokenData>) -> Rc<Node> {
+fn expressionize_input(mut tokens: Vec<TokenData>) -> Vec<Rc<Node>> {
     let input = handle_input();
     tokens.append(&mut parser::tokenize(input.trim(), 0));
-    let result = analyzer::expressionize(&tokens);
+    let (result, _) = analyzer::expressionize(&tokens);
 
-    if let Some(expression_tree) = result {
-        expression_tree
+    if result.len() > 0 {
+        result
     } else {
         expressionize_input(tokens)
     }

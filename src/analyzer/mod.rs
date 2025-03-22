@@ -1,4 +1,5 @@
 use crate::TokenData;
+use std::collections::HashMap;
 use std::fmt;
 use std::{
     cell::RefCell,
@@ -39,9 +40,10 @@ impl Debug for Node {
     }
 }
 
-pub fn expressionize(tokens: &Vec<TokenData>) -> Option<Rc<Node>> {
+pub fn expressionize(tokens: &Vec<TokenData>) -> (Vec<Rc<Node>>, HashMap<String, Node>) {
     let mut current_node: Option<Rc<Node>> = None;
     let mut depth = 0;
+    let mut nodes: Vec<Rc<Node>> = Vec::new();
 
     for token_data in tokens {
         match token_data.token {
@@ -54,10 +56,8 @@ pub fn expressionize(tokens: &Vec<TokenData>) -> Option<Rc<Node>> {
 
                 if let Some(ref c_n) = current_node {
                     c_n.children.borrow_mut().push(new_node.clone());
-                    current_node = Some(new_node);
-                } else {
-                    current_node = Some(new_node);
                 }
+                current_node = Some(new_node);
             }
             Token::Value(value) => {
                 let new_node = Rc::new(Node {
@@ -74,11 +74,24 @@ pub fn expressionize(tokens: &Vec<TokenData>) -> Option<Rc<Node>> {
             Token::CloseParenthesis => {
                 depth -= 1;
                 if depth > 0 {
-                    current_node = current_node.unwrap().get_parent()
+                    if let Some(c_n) = current_node {
+                        if c_n.get_parent().is_none() {
+                            nodes.push(c_n.clone());
+                        }
+                        current_node = c_n.get_parent()
+                    }
+                }
+                if depth < 0 {
+                    todo!("error out too many closing parentheses")
                 }
             }
-            Token::TokenizationError(_) => todo!(),
+            _ => todo!(),
         }
     }
-    if depth != 0 { None } else { current_node }
+
+    if depth != 0 {
+        (vec![], HashMap::new())
+    } else {
+        (nodes, HashMap::new())
+    }
 }

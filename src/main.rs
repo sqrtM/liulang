@@ -12,12 +12,16 @@ fn main() {
     utils::show_license_notice();
     match env::args().collect::<Vec<String>>().get(1) {
         Some(path) => {
-            let expression_tree = utils::evaluate(path);
-            println!("{:?}", interpreter::execute(expression_tree));
+            let expressions = utils::evaluate(path);
+            for expression in expressions {
+                println!("{:?}", interpreter::flatten(expression));
+            }
         }
         None => loop {
-            let expression_tree = repl::evaluate();
-            println!("{:?}", interpreter::execute(expression_tree));
+            let expressions = repl::evaluate();
+            for expression in expressions {
+                println!("{:?}", interpreter::flatten(expression));
+            }
         },
     };
 }

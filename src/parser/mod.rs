@@ -3,7 +3,11 @@ use std::str::FromStr;
 pub fn tokenize(line: &str, row: usize) -> std::vec::Vec<TokenData> {
     LineToParse::new(line)
         .map(|(raw_token, token_position)| {
-            TokenData::new(raw_token, row + 1, line.len() - token_position - 1)
+            TokenData::new(
+                raw_token,
+                row + 1,
+                line.chars().count() - token_position - 1,
+            )
         })
         .collect::<Vec<TokenData>>()
 }
@@ -32,6 +36,12 @@ pub enum Token {
     OpenParenthesis,
     CloseParenthesis,
     TokenizationError(String),
+    Keyword(Keyword),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Keyword {
+    Defun,
 }
 
 impl Token {

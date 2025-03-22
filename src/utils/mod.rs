@@ -1,12 +1,73 @@
 use std::{
     fs::File,
     io::{self, BufRead},
+    path::PathBuf,
     rc::Rc,
 };
 
-use crate::{analyzer, parser};
+use crate::{
+    analyzer::{self, Node},
+    parser::{self, TokenData},
+};
 
-pub fn evaluate(path: &str) -> Rc<analyzer::Node> {
+enum InputType {
+    Repl,
+    File(PathBuf),
+}
+
+enum ContextType {
+    Input(InputContext),
+    Parser(ParserContext),
+    Analyzer(AnalyzerContext),
+}
+
+struct InputContext {
+    input_type: InputType,
+    line: String,
+    line_number: usize,
+}
+
+impl InputContext {
+    fn new(input_type: InputType, line: String, line_number: usize) -> Self {
+        Self {
+            input_type,
+            line,
+            line_number,
+        }
+    }
+}
+
+struct ParserContext {
+    tokens: Vec<TokenData>,
+    input_context: InputContext,
+}
+
+impl ParserContext {
+    fn new(tokens: Vec<TokenData>, input_context: InputContext) -> Self {
+        Self {
+            tokens,
+            input_context,
+        }
+    }
+}
+
+struct AnalyzerContext;
+
+impl AnalyzerContext {
+    fn new() -> Self {
+        Self
+    }
+}
+
+struct Pipeline;
+
+impl Pipeline {
+    fn new(ctx: ContextType) -> Self {
+        Self
+    }
+}
+
+pub fn evaluate(path: &str) -> Vec<Rc<Node>> {
     let file = File::open(path).unwrap();
 
     let reader = io::BufReader::new(file);
@@ -16,7 +77,7 @@ pub fn evaluate(path: &str) -> Rc<analyzer::Node> {
         .enumerate()
         .flat_map(|(i, line)| parser::tokenize(&line.unwrap(), i))
         .collect();
-    analyzer::expressionize(&tokens).unwrap()
+    analyzer::expressionize(&tokens).0
 }
 
 pub fn show_license_notice() {
