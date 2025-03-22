@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{self, BufRead},
     path::PathBuf,
@@ -7,7 +8,8 @@ use std::{
 
 use crate::{
     analyzer::{self, Node},
-    parser::{self, TokenData},
+    interpreter,
+    parser::{self, TokenData, Value},
 };
 
 enum InputType {
@@ -19,65 +21,137 @@ enum ContextType {
     Input(InputContext),
     Parser(ParserContext),
     Analyzer(AnalyzerContext),
+    Interpreter(InterpreterContext),
+    Output(OutputContext),
 }
 
 struct InputContext {
     input_type: InputType,
-    line: String,
-    line_number: usize,
 }
 
 impl InputContext {
-    fn new(input_type: InputType, line: String, line_number: usize) -> Self {
-        Self {
-            input_type,
-            line,
-            line_number,
+    fn into(self, lines: Vec<String>) -> ParserContext {
+        ParserContext {
+            lines,
+            input_context: self,
         }
     }
 }
 
 struct ParserContext {
-    tokens: Vec<TokenData>,
+    lines: Vec<String>,
     input_context: InputContext,
 }
 
 impl ParserContext {
-    fn new(tokens: Vec<TokenData>, input_context: InputContext) -> Self {
-        Self {
-            tokens,
-            input_context,
+    fn into(self, token_data: Vec<TokenData>) -> AnalyzerContext {
+        AnalyzerContext {
+            token_data,
+            parser_context: self,
         }
     }
 }
 
-struct AnalyzerContext;
+struct InterpreterContext {
+    expression_data: (Vec<Rc<Node>>, HashMap<String, Node>),
+    analyzer_context: AnalyzerContext,
+}
 
 impl AnalyzerContext {
-    fn new() -> Self {
-        Self
+    fn into(self, expression_data: (Vec<Rc<Node>>, HashMap<String, Node>)) -> InterpreterContext {
+        InterpreterContext {
+            expression_data,
+            analyzer_context: self,
+        }
     }
 }
 
-struct Pipeline;
+struct AnalyzerContext {
+    token_data: Vec<TokenData>,
+    parser_context: ParserContext,
+}
+
+impl InterpreterContext {
+    fn into(self, values: Vec<Value>) -> OutputContext {
+        OutputContext {
+            values,
+            //interpreter_context: self,
+        }
+    }
+}
+
+struct OutputContext {
+    values: Vec<Value>,
+    //interpreter_context: InterpreterContext,
+}
+
+pub struct Pipeline {
+    ctx: ContextType,
+}
 
 impl Pipeline {
-    fn new(ctx: ContextType) -> Self {
-        Self
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            ctx: ContextType::Input(InputContext {
+                input_type: InputType::File(path),
+            }),
+        }
     }
-}
 
-pub fn evaluate(path: &str) -> Vec<Rc<Node>> {
-    let file = File::open(path).unwrap();
-
-    let reader = io::BufReader::new(file);
-
-    let tokens = reader
-        .lines()
-        .enumerate()
-        .flat_map(|(i, line)| parser::tokenize(&line.unwrap(), i))
-        .collect();
-    analyzer::expressionize(&tokens).0
+    pub fn run(self) -> Self {
+        match self.ctx {
+            ContextType::Input(input_context) => match input_context.input_type {
+                InputType::Repl => todo!(),
+                InputType::File(ref path_buf) => {
+                    let file = File::open(path_buf).unwrap();
+                    let lines = io::BufReader::new(file)
+                        .lines()
+                        .map_while(Result::ok)
+                        .collect();
+                    Self {
+                        ctx: ContextType::Parser(input_context.into(lines)),
+                    }
+                }
+            },
+            ContextType::Parser(parser_context) => {
+                let tokens = parser_context
+                    .lines
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, line)| parser::tokenize(line, i))
+                    .collect();
+                Self {
+                    ctx: ContextType::Analyzer(parser_context.into(tokens)),
+                }
+            }
+            ContextType::Analyzer(analyzer_context) => {
+                let aaa = analyzer::expressionize(&analyzer_context.token_data);
+                Self {
+                    ctx: ContextType::Interpreter(analyzer_context.into(aaa)),
+                }
+            }
+            ContextType::Interpreter(interpreter_context) => {
+                let values = interpreter_context
+                    .expression_data
+                    .0
+                    .iter()
+                    .map(interpreter::flatten)
+                    .collect();
+                Self {
+                    ctx: ContextType::Output(interpreter_context.into(values)),
+                }
+            }
+            ContextType::Output(output_context) => {
+                output_context
+                    .values
+                    .iter()
+                    .for_each(|v| println!("{:?}", v));
+                Self {
+                    ctx: ContextType::Output(output_context),
+                }
+            }
+        }
+    }
 }
 
 pub fn show_license_notice() {

@@ -1,3 +1,5 @@
+use utils::Pipeline;
+
 use crate::parser::TokenData;
 
 use std::env;
@@ -12,15 +14,13 @@ fn main() {
     utils::show_license_notice();
     match env::args().collect::<Vec<String>>().get(1) {
         Some(path) => {
-            let expressions = utils::evaluate(path);
-            for expression in expressions {
-                println!("{:?}", interpreter::flatten(expression));
-            }
+            let pipeline = Pipeline::new(path.into());
+            pipeline.run().run().run().run().run()
         }
         None => loop {
             let expressions = repl::evaluate();
             for expression in expressions {
-                println!("{:?}", interpreter::flatten(expression));
+                println!("{:?}", interpreter::flatten(&expression));
             }
         },
     };
