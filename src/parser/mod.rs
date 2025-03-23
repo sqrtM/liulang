@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{rc::Rc, str::FromStr};
 
 pub fn tokenize(line: &str, row: usize) -> std::vec::Vec<TokenData> {
     LineToParse::new(line)
@@ -41,7 +41,18 @@ pub enum Token {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Keyword {
-    Defun,
+    Def,
+}
+
+impl FromStr for Keyword {
+    type Err = ParseErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "def" => Ok(Self::Def),
+            _ => Err(ParseErr),
+        }
+    }
 }
 
 impl Token {
@@ -59,6 +70,7 @@ impl FromStr for Token {
     type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse_keyword = s.parse::<Keyword>().map(Token::Keyword);
         let parse_operator = s.parse::<Operator>().map(Token::Operator);
         let parse_value = s.parse::<Value>().map(Token::Value);
         let parse_parenthesis = match s {
@@ -67,7 +79,10 @@ impl FromStr for Token {
             _ => Err(ParseErr),
         };
 
-        parse_operator.or(parse_value).or(parse_parenthesis)
+        parse_keyword
+            .or(parse_parenthesis)
+            .or(parse_operator)
+            .or(parse_value)
     }
 }
 
@@ -89,9 +104,11 @@ impl FromStr for Operator {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Value {
     Int(i64),
+    Identifier(Rc<String>),
+    Variable(Rc<Value>),
 }
 
 impl std::ops::Add for Value {
@@ -101,8 +118,10 @@ impl std::ops::Add for Value {
         Value::Int(
             match self {
                 Value::Int(s) => s,
+                _ => todo!(),
             } + match rhs {
                 Value::Int(r) => r,
+                _ => todo!(),
             },
         )
     }
@@ -115,8 +134,10 @@ impl std::ops::Sub for Value {
         Value::Int(
             match self {
                 Value::Int(s) => s,
+                _ => todo!(),
             } - match rhs {
                 Value::Int(r) => r,
+                _ => todo!(),
             },
         )
     }
@@ -128,7 +149,7 @@ impl FromStr for Value {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.parse::<i64>() {
             Ok(res) => Ok(Self::Int(res)),
-            Err(_) => Err(ParseErr),
+            Err(_) => Ok(Self::Identifier(Rc::new(s.to_string()))),
         }
     }
 }

@@ -15,7 +15,7 @@ fn main() {
     match env::args().collect::<Vec<String>>().get(1) {
         Some(path) => {
             let pipeline = Pipeline::new(path.into());
-            pipeline.run().run().run().run().run()
+            pipeline.run()
         }
         None => loop {
             let expressions = repl::evaluate();

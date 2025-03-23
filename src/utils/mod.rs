@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fs::File,
     io::{self, BufRead},
     path::PathBuf,
@@ -7,13 +6,12 @@ use std::{
 };
 
 use crate::{
-    analyzer::{self, Node},
-    interpreter,
+    analyzer::{self, CtxNode},
+    interpreter::flatten,
     parser::{self, TokenData, Value},
 };
 
 enum InputType {
-    Repl,
     File(PathBuf),
 }
 
@@ -33,42 +31,42 @@ impl InputContext {
     fn into(self, lines: Vec<String>) -> ParserContext {
         ParserContext {
             lines,
-            input_context: self,
+            //input_context: self,
         }
     }
 }
 
 struct ParserContext {
     lines: Vec<String>,
-    input_context: InputContext,
+    //input_context: InputContext,
 }
 
 impl ParserContext {
     fn into(self, token_data: Vec<TokenData>) -> AnalyzerContext {
         AnalyzerContext {
             token_data,
-            parser_context: self,
+            //parser_context: self,
         }
     }
 }
 
 struct InterpreterContext {
-    expression_data: (Vec<Rc<Node>>, HashMap<String, Node>),
-    analyzer_context: AnalyzerContext,
+    expression_data: Rc<CtxNode>,
+    //analyzer_context: AnalyzerContext,
 }
 
 impl AnalyzerContext {
-    fn into(self, expression_data: (Vec<Rc<Node>>, HashMap<String, Node>)) -> InterpreterContext {
+    fn into(self, expression_data: Rc<CtxNode>) -> InterpreterContext {
         InterpreterContext {
             expression_data,
-            analyzer_context: self,
+            // analyzer_context: self,
         }
     }
 }
 
 struct AnalyzerContext {
     token_data: Vec<TokenData>,
-    parser_context: ParserContext,
+    //parser_context: ParserContext,
 }
 
 impl InterpreterContext {
@@ -101,7 +99,6 @@ impl Pipeline {
     pub fn run(self) -> Self {
         match self.ctx {
             ContextType::Input(input_context) => match input_context.input_type {
-                InputType::Repl => todo!(),
                 InputType::File(ref path_buf) => {
                     let file = File::open(path_buf).unwrap();
                     let lines = io::BufReader::new(file)
@@ -111,6 +108,7 @@ impl Pipeline {
                     Self {
                         ctx: ContextType::Parser(input_context.into(lines)),
                     }
+                    .run()
                 }
             },
             ContextType::Parser(parser_context) => {
@@ -123,23 +121,45 @@ impl Pipeline {
                 Self {
                     ctx: ContextType::Analyzer(parser_context.into(tokens)),
                 }
+                .run()
             }
             ContextType::Analyzer(analyzer_context) => {
                 let aaa = analyzer::expressionize(&analyzer_context.token_data);
+
                 Self {
                     ctx: ContextType::Interpreter(analyzer_context.into(aaa)),
                 }
+                .run()
             }
             ContextType::Interpreter(interpreter_context) => {
-                let values = interpreter_context
-                    .expression_data
-                    .0
-                    .iter()
-                    .map(interpreter::flatten)
-                    .collect();
-                Self {
-                    ctx: ContextType::Output(interpreter_context.into(values)),
+                let mut visted: Vec<usize> = vec![];
+                let mut cur = interpreter_context.expression_data.clone();
+                let mut vals: Vec<Value> = vec![];
+                'outer: loop {
+                    visted.push(cur.id);
+                    if let Some(val) = cur.expression.borrow().clone().map(|e| flatten(&e)) {
+                        vals.push(val.clone());
+                    }
+
+                    let kids = &cur.clone().children.borrow().clone();
+
+                    for child in kids.iter() {
+                        if !visted.iter().any(|&v| v == child.id) {
+                            cur = child.clone();
+                            continue 'outer;
+                        }
+                    }
+                    if cur.parent.clone().unwrap().id != 0 {
+                        cur = cur.parent.clone().unwrap();
+                    } else {
+                        break 'outer;
+                    }
                 }
+
+                Self {
+                    ctx: ContextType::Output(interpreter_context.into(vals)),
+                }
+                .run()
             }
             ContextType::Output(output_context) => {
                 output_context

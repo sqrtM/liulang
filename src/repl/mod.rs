@@ -3,14 +3,13 @@ use std::{
     rc::Rc,
 };
 
-use crate::{
-    analyzer::{self, Node},
-    parser::{self, TokenData},
-};
+use crate::analyzer::Node;
 
 pub fn evaluate() -> Vec<Rc<Node>> {
     init_terminal();
-    expressionize_input(Vec::new())
+
+    //expressionize_input(Vec::new())
+    todo!()
 }
 
 fn init_terminal() {
@@ -19,7 +18,7 @@ fn init_terminal() {
     );
     io::stdout().flush().unwrap();
 }
-
+/*
 fn handle_input() -> String {
     print!("\x1b[1;0m> ");
     io::stdout().flush().unwrap();
@@ -33,14 +32,15 @@ fn handle_input() -> String {
     input
 }
 
-fn expressionize_input(mut tokens: Vec<TokenData>) -> Vec<Rc<Node>> {
+fn expressionize_input(mut tokens: Vec<TokenData>) -> Rc<CtxNode> {
     let input = handle_input();
     tokens.append(&mut parser::tokenize(input.trim(), 0));
-    let (result, _) = analyzer::expressionize(&tokens);
+    let result = analyzer::expressionize(&tokens);
 
-    if result.len() > 0 {
+    if result.as_ref().children.borrow().len() > 0 {
         result
     } else {
         expressionize_input(tokens)
     }
 }
+ */
