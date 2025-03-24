@@ -39,6 +39,7 @@ pub fn flatten(t: &Rc<Node>) -> Value {
                 None => todo!(),
             },
             Value::Variable(_) => value,
+            Value::Expression(_, _) => value,
         },
         Token::Keyword(keyword) => match keyword {
             Keyword::Def => {

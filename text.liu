@@ -8,8 +8,8 @@
             ( def b 100 )
             ( + a b )
             (
-                ( def c 115 )
-                ( + a b c )
+                ( def c ( + a b ) )
+                ( + c c )
             )
         )
     )

@@ -1,5 +1,7 @@
 use std::{rc::Rc, str::FromStr};
 
+use crate::analyzer::{CtxNode, Node};
+
 pub fn tokenize(line: &str, row: usize) -> std::vec::Vec<TokenData> {
     LineToParse::new(line)
         .map(|(raw_token, token_position)| {
@@ -104,11 +106,12 @@ impl FromStr for Operator {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Value {
     Int(i64),
     Identifier(Rc<String>),
     Variable(Rc<Value>),
+    Expression(Vec<Rc<Value>>, Rc<CtxNode>),
 }
 
 impl std::ops::Add for Value {
