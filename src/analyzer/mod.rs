@@ -17,9 +17,35 @@ pub struct Node {
     pub context: Rc<CtxNode>,
 }
 
+impl Default for Node {
+    fn default() -> Self {
+        Self {
+            token: Token::default(),
+            parent: None,
+            children: RefCell::new(Vec::new()),
+            context: Rc::new(CtxNode::default()),
+        }
+    }
+}
+
 impl Node {
     fn get_parent(&self) -> Option<Rc<Self>> {
         self.parent.clone()
+    }
+
+    fn set_token(mut self, token: Token) -> Self {
+        self.token = token;
+        self
+    }
+
+    fn set_parent(mut self, parent: Option<Rc<Node>>) -> Self {
+        self.parent = parent;
+        self
+    }
+
+    fn set_context(mut self, ctx: Rc<CtxNode>) -> Self {
+        self.context = ctx;
+        self
     }
 }
 
@@ -50,6 +76,18 @@ pub struct CtxNode {
     pub expression: RefCell<Option<Rc<Node>>>,
 }
 
+impl Default for CtxNode {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            context: RefCell::new(HashMap::new()),
+            parent: None,
+            children: RefCell::new(Vec::new()),
+            expression: RefCell::new(None),
+        }
+    }
+}
+
 impl Debug for CtxNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let p = self.parent.as_ref().map(|p| p.id);
@@ -65,111 +103,140 @@ impl Debug for CtxNode {
     }
 }
 
-pub fn expressionize(tokens: &Vec<TokenData>) -> Rc<CtxNode> {
+impl CtxNode {
+    fn set_parent(mut self, parent: Option<Rc<CtxNode>>) -> Self {
+        self.parent = parent;
+        self
+    }
+
+    fn new(index: usize) -> Self {
+        Self {
+            id: index,
+            ..Default::default()
+        }
+    }
+}
+
+pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
     let mut current_node: Option<Rc<Node>> = None;
+    let mut current_parent_node: Option<Rc<Node>> = None;
     let mut depth = 0;
     let mut nodes: Vec<Rc<Node>> = Vec::new();
     let mut index = 0;
 
-    let mut ctxnode = Rc::new(CtxNode {
-        id: index,
-        context: RefCell::new(HashMap::new()),
-        parent: None,
-        children: RefCell::new(vec![]),
-        expression: RefCell::new(None),
-    });
+    let mut ctxnode = Rc::new(CtxNode::default());
 
-    for token_data in tokens {
-        match token_data.token.clone() {
+    let mut idx = 0;
+
+    loop {
+        if idx >= tokens.len() {
+            break;
+        }
+
+        match tokens[idx].token.clone() {
             Token::Operator(operator) => {
-                let new_node = Rc::new(Node {
-                    token: Token::Operator(operator),
-                    parent: current_node.clone(),
-                    children: RefCell::new(vec![]),
-                    context: ctxnode.clone(),
-                });
+                let new_node = Rc::new(
+                    Node::default()
+                        //.set_parent(current_node.clone()) -- not implemented
+                        .set_token(Token::Operator(operator))
+                        .set_context(ctxnode.clone()),
+                );
 
-                if let Some(ref c_n) = current_node {
+                if let Some(ref c_n) = current_parent_node {
                     c_n.children.borrow_mut().push(new_node.clone());
                 }
-                current_node = Some(new_node);
+                current_node = Some(new_node.clone());
+                current_parent_node = Some(new_node);
             }
             Token::Value(value) => {
-                let new_node = Rc::new(Node {
-                    token: Token::Value(value),
-                    parent: current_node.clone(),
-                    children: RefCell::new(vec![]),
-                    context: ctxnode.clone(),
-                });
+                if let Some(ref c_n) = current_parent_node {
+                    let new_node = Rc::new(
+                        Node::default()
+                            .set_token(Token::Value(value))
+                            .set_context(ctxnode.clone())
+                            .set_parent(current_parent_node.clone()),
+                    );
 
-                if let Some(ref c_n) = current_node {
                     c_n.children.borrow_mut().push(new_node.clone());
+                    current_node = Some(new_node);
+                } else {
+                    let new_node = Node::default()
+                        .set_token(Token::Value(value))
+                        .set_context(ctxnode.clone());
+
+                    current_node = Some(Rc::new(new_node));
                 }
             }
             Token::OpenParenthesis => {
                 depth += 1;
                 index += 1;
-                let new_ctxnode = CtxNode {
-                    id: index,
-                    context: RefCell::new(HashMap::new()),
-                    parent: Some(ctxnode),
-                    children: RefCell::new(vec![]),
-                    expression: RefCell::new(None),
-                };
+                let new_ctxnode = Rc::new(CtxNode::new(index).set_parent(Some(ctxnode)));
 
-                ctxnode = Rc::new(new_ctxnode);
+                if tokens[idx + 1].token == Token::CloseParenthesis {
+                    let new_node = Rc::new(
+                        Node::default()
+                            .set_parent(current_parent_node.clone())
+                            .set_context(new_ctxnode.clone()),
+                    );
+                    if let Some(c_n) = current_parent_node.clone() {
+                        c_n.children.borrow_mut().push(new_node.clone());
+                    }
+                    // This will be a unit type. We can skip the next token.
+                    idx += 1;
+                    depth -= 1;
+                    current_node = Some(new_node);
+                    ctxnode = new_ctxnode;
+                } else {
+                    current_node = None;
+                    ctxnode = new_ctxnode;
+                }
             }
             Token::CloseParenthesis => {
                 depth -= 1;
-                if depth > 0 {
-                    if let Some(c_n) = current_node {
-                        if c_n.get_parent().is_none() {
-                            nodes.push(c_n.clone());
-                        }
-                        ctxnode.expression.swap(&RefCell::new(Some(c_n.clone())));
-                        current_node = c_n.get_parent()
-                    }
 
-                    if let Some(ref cur_ctx_node) = ctxnode.parent {
-                        if cur_ctx_node.parent.is_none() {
-                            todo!()
-                        } else {
-                            ctxnode
-                                .parent
-                                .as_ref()
-                                .unwrap()
-                                .children
-                                .borrow_mut()
-                                .push(ctxnode.clone());
-                            ctxnode = ctxnode.parent.clone().unwrap()
-                        }
+                if let Some(c_n) = current_node {
+                    if c_n.get_parent().is_none() {
+                        nodes.push(c_n.clone());
+                    } else {
+                        ctxnode
+                            .expression
+                            .swap(&RefCell::new(Some(c_n.get_parent().unwrap().clone())));
                     }
+                    current_node = c_n.get_parent()
                 }
+
+                if let Some(ref cur_ctx_node) = ctxnode.parent {
+                    cur_ctx_node.children.borrow_mut().push(ctxnode.clone());
+                    ctxnode = ctxnode.parent.clone().unwrap()
+                }
+
                 if depth < 0 {
                     todo!("error out too many closing parentheses")
                 }
             }
             Token::Keyword(keyword) => match keyword {
                 Keyword::Def => {
-                    let new_node = Rc::new(Node {
-                        token: Token::Keyword(Keyword::Def),
-                        parent: current_node.clone(),
-                        children: RefCell::new(vec![]),
-                        context: ctxnode.clone(),
-                    });
+                    let new_node = Rc::new(
+                        Node::default()
+                            //.set_parent(current_node.clone()) -- not implemented
+                            .set_token(Token::Keyword(Keyword::Def))
+                            .set_context(ctxnode.clone()),
+                    );
 
-                    if let Some(ref c_n) = current_node {
-                        c_n.children.borrow_mut().push(new_node.clone());
+                    if current_node.is_some() {
+                        panic!("not implemented")
                     }
-                    current_node = Some(new_node);
+                    current_node = Some(new_node.clone());
+                    current_parent_node = Some(new_node);
                 }
             },
             _ => todo!(),
         }
+        idx += 1;
     }
 
     if depth != 0 {
-        todo!("bad parentheses")
+        todo!("bad parentheses ; depth = {:?}", depth)
     } else {
         ctxnode
     }

@@ -133,10 +133,17 @@ impl Pipeline {
             }
             ContextType::Interpreter(interpreter_context) => {
                 let mut visted: Vec<usize> = vec![];
+
+                println!(
+                    "BJDSKLFJSDLFHJKDSLHFJKSDLF {:#?}",
+                    interpreter_context.expression_data
+                );
+
                 let mut cur = interpreter_context.expression_data.clone();
                 let mut vals: Vec<Value> = vec![];
                 'outer: loop {
                     visted.push(cur.id);
+
                     if let Some(val) = cur.expression.borrow().clone().map(|e| flatten(&e)) {
                         vals.push(val.clone());
                     }

@@ -1,6 +1,6 @@
 use std::{rc::Rc, str::FromStr};
 
-use crate::analyzer::{CtxNode, Node};
+use crate::analyzer::CtxNode;
 
 pub fn tokenize(line: &str, row: usize) -> std::vec::Vec<TokenData> {
     LineToParse::new(line)
@@ -39,6 +39,13 @@ pub enum Token {
     CloseParenthesis,
     TokenizationError(String),
     Keyword(Keyword),
+    Unit,
+}
+
+impl Default for Token {
+    fn default() -> Self {
+        Self::Unit
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -110,8 +117,8 @@ impl FromStr for Operator {
 pub enum Value {
     Int(i64),
     Identifier(Rc<String>),
-    Variable(Rc<Value>),
     Expression(Vec<Rc<Value>>, Rc<CtxNode>),
+    Unit,
 }
 
 impl std::ops::Add for Value {
@@ -124,7 +131,7 @@ impl std::ops::Add for Value {
                 _ => todo!(),
             } + match rhs {
                 Value::Int(r) => r,
-                _ => todo!(),
+                _ => todo!("{:?}", rhs),
             },
         )
     }
