@@ -1,7 +1,9 @@
 (
     (def a () 1)
-    (def b () 2)
+    (def b ()
+        (+ a 2)
+    )
     (def c () b)
-    (def d () c)
+    (def d () (+ 2 2))
     (+ a b c d)
 )

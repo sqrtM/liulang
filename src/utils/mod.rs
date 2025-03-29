@@ -133,26 +133,31 @@ impl Pipeline {
             }
             ContextType::Interpreter(interpreter_context) => {
                 let mut visted: Vec<usize> = vec![];
-
-                println!("FIRST NODE IS : {:#?}", interpreter_context.expression_data);
-
                 let mut cur = interpreter_context.expression_data.clone();
                 let mut vals: Vec<Value> = vec![];
                 'outer: loop {
-                    visted.push(cur.id);
-
-                    if let Some(val) = cur.expression.borrow().clone().map(|e| flatten(&e)) {
-                        vals.push(val.clone());
+                    // Have we already executed this node ?
+                    if !visted.iter().any(|&v| v == cur.id) {
+                        visted.push(cur.id);
+                        if let Some(val) = cur.expression.borrow().clone().map(|e| flatten(&e)) {
+                            // This is to say, we are at the highest level of meaningful expression.
+                            // One below the "file-level" scope of 0.
+                            if cur.parent.as_ref().map(|e| e.id) == Some(1) {
+                                vals.push(val.clone());
+                            }
+                        }
                     }
 
+                    // Have we hit all child nodes for this node ?
                     let kids = &cur.clone().children.borrow().clone();
-
                     for child in kids.iter() {
                         if !visted.iter().any(|&v| v == child.id) {
                             cur = child.clone();
                             continue 'outer;
                         }
                     }
+
+                    // ... If so, find another node higher in the tree.
                     if cur.parent.clone().unwrap().id != 0 {
                         cur = cur.parent.clone().unwrap();
                     } else {
