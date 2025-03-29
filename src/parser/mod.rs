@@ -177,21 +177,21 @@ impl<'a> LineToParse<'a> {
 impl<'a> Iterator for LineToParse<'a> {
     type Item = (&'a str, usize);
 
-    fn next(&mut self) -> Option<(&'a str, usize)> {
+    fn next(&mut self) -> Option<Self::Item> {
         let mut chars = self.line.char_indices();
-        let curr_char = chars.next()?.1;
+        let (_char_pos, curr_char) = chars.next()?;
 
         let next = chars
             .find(|(_, c)| token_should_end(curr_char, *c))
             .map_or(self.line.len(), |(i, _)| i);
 
-        let (before, after) = self.line.split_at(next);
-        self.line = after;
+        let (token, rest) = self.line.split_at(next);
+        self.line = rest;
 
-        if before.trim().is_empty() {
+        if token.trim().is_empty() {
             self.next()
         } else {
-            Some((before.trim(), self.line.len()))
+            Some((token.trim(), self.line.len()))
         }
     }
 }

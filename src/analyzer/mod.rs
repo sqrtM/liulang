@@ -127,18 +127,15 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
 
     let mut idx = 0;
 
-    loop {
-        if idx >= tokens.len() {
-            break;
-        }
-
+    while idx < tokens.len() {
         match tokens[idx].token.clone() {
-            Token::Operator(operator) => {
-                let n = Node::default()
-                    .set_token(Token::Operator(operator))
-                    .set_context(ctxnode.clone());
-                let new_node =
-                    Rc::new(n.set_parent(current_parent_node.as_ref().map(|c_n| c_n.clone())));
+            Token::Operator(_) => {
+                let new_node = Rc::new(
+                    Node::default()
+                        .set_token(tokens[idx].token.clone())
+                        .set_context(ctxnode.clone())
+                        .set_parent(current_parent_node.clone()),
+                );
 
                 if let Some(ref c_n) = current_parent_node {
                     c_n.children.borrow_mut().push(new_node.clone());
@@ -148,11 +145,11 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                 current_parent_node = Some(new_node);
             }
 
-            Token::Value(value) => {
+            Token::Value(_) => {
                 if let Some(ref c_n) = current_parent_node {
                     let new_node = Rc::new(
                         Node::default()
-                            .set_token(Token::Value(value))
+                            .set_token(tokens[idx].token.clone())
                             .set_context(ctxnode.clone())
                             .set_parent(current_parent_node.clone()),
                     );
@@ -161,7 +158,7 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                     current_node = Some(new_node);
                 } else {
                     let new_node = Node::default()
-                        .set_token(Token::Value(value))
+                        .set_token(tokens[idx].token.clone())
                         .set_context(ctxnode.clone());
 
                     current_node = Some(Rc::new(new_node));
@@ -195,22 +192,20 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
             Token::CloseParenthesis => {
                 depth -= 1;
 
-                if let Some(c_n) = current_node {
-                    if c_n.get_parent().is_some() {
-                        ctxnode
-                            .expression
-                            .swap(&RefCell::new(Some(c_n.get_parent().unwrap().clone())));
+                if let Some(ref c_n) = current_node {
+                    if let Some(parent) = c_n.get_parent() {
+                        ctxnode.expression.swap(&RefCell::new(Some(parent.clone())));
+                        current_node = c_n.get_parent();
                     }
-                    current_node = c_n.get_parent()
                 }
 
                 if let Some(ref par_ctx_node) = ctxnode.parent {
                     par_ctx_node.children.borrow_mut().push(ctxnode.clone());
-                    ctxnode = ctxnode.parent.clone().unwrap();
+                    ctxnode = par_ctx_node.clone();
                 }
 
-                if let Some(ref c_p_n) = current_parent_node {
-                    current_parent_node = c_p_n.get_parent()
+                if let Some(c_p_n) = current_parent_node {
+                    current_parent_node = c_p_n.get_parent();
                 }
 
                 if depth < 0 {

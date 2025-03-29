@@ -1,12 +1,12 @@
 (
-    (def a () 100)
+    (def a () 124)
     (def b ()
         (+ a 2)
     )
     (def c () b)
     (def d ()
         (+ 2
-            (+ a b)
+            (+ a b c c c c)
         )
     )
     (+ 2 2)

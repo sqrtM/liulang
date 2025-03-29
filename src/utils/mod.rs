@@ -138,8 +138,6 @@ impl Pipeline {
                 'outer: loop {
                     // Have we already executed this node ?
                     if !visted.iter().any(|&v| v == cur.id) {
-                        println!("{:?}", cur.clone().id);
-                        println!("{:?}", cur.clone().expression);
                         visted.push(cur.id);
                         if let Some(val) = cur.expression.borrow().clone().map(|e| flatten(&e)) {
                             // This is to say, we are at the highest level of meaningful expression.

@@ -9,102 +9,61 @@ pub fn flatten(t: &Rc<Node>) -> Value {
     let children = t.children.borrow();
 
     match t.token.clone() {
-        Token::Operator(operator) => match operator {
-            Operator::Plus => children
-                .iter()
-                .fold(Value::Int(0), |acc, child| acc + flatten(&child.clone())),
-            Operator::Minus => children
-                .iter()
-                .skip(1)
-                .fold(flatten(&children[0].clone()), |acc, child| {
-                    acc - flatten(&child.clone())
-                }),
-        },
+        Token::Operator(operator) => apply_operator(&operator, &children),
         Token::Value(value) => match value {
-            Value::Unit => value,
-            Value::Int(_) => value,
             Value::Identifier(ref name) => {
-                match &t.parent {
-                    Some(par) => match &par.token {
-                        Token::Keyword(keyword) => match keyword {
-                            Keyword::Def => {
-                                // We are currently defining this value,
-                                // so return it as it.
-                                if t.parent
-                                    .as_ref()
-                                    .unwrap()
-                                    .children
-                                    .borrow()
-                                    .first()
-                                    .unwrap()
-                                    .token
-                                    == t.token
-                                {
-                                    value
-                                } else {
-                                    match resolve_variable(name, &t.context) {
-                                        Some(val) => val.clone(),
-                                        None => {
-                                            panic!("{:?}", t);
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        _ => match resolve_variable(name, &t.context) {
-                            Some(val) => val.clone(),
-                            None => {
-                                panic!("{:?}", t);
-                            }
-                        },
-                    },
-                    None => todo!("couldnt find the parent ? that doesn't make logical sense"),
+                if let Some(par) = &t.parent {
+                    if let Token::Keyword(Keyword::Def) = par.token {
+                        // We are currently defining this value, so return it as it.
+                        if par.children.borrow().first().map(|c| &c.token) == Some(&t.token) {
+                            return value;
+                        }
+                    }
                 }
+
+                resolve_variable(name, &t.context).unwrap_or_else(|| panic!("{:?}", t))
             }
-            Value::Expression(_, _) => value,
+            _ => value,
         },
-        Token::Keyword(keyword) => match keyword {
-            Keyword::Def => {
-                let symbol = flatten(children.first().unwrap());
-                let identifier = match symbol {
-                    Value::Identifier(identifier) => identifier,
-                    _ => todo!("unexpected symbol"),
-                };
 
-                let args: Option<Value> = match children.get(1) {
-                    Some(arg) => match Some(flatten(arg)) {
-                        Some(x) => match x {
-                            Value::Unit => Some(Value::Unit),
-                            _ => todo!("only units for now"),
-                        },
-                        None => todo!(" no args ???"),
-                    },
-                    None => None,
-                };
+        Token::Keyword(Keyword::Def) => {
+            let symbol = flatten(children.first().unwrap());
+            let identifier = match symbol {
+                Value::Identifier(identifier) => identifier,
+                _ => todo!("unexpected symbol"),
+            };
 
-                let inner_args = match args {
-                    Some(x) => x,
-                    None => todo!(),
-                };
+            let args = children.get(1).map(|arg| match flatten(arg) {
+                Value::Unit => Value::Unit,
+                _ => todo!("only units for now"),
+            });
 
-                let value = match children.get(2) {
-                    Some(child) => flatten(child),
-                    None => todo!(),
-                };
+            let value = children.get(2).map(flatten).unwrap_or_else(|| todo!());
 
-                t.context
-                    .parent
-                    .as_ref()
-                    .unwrap()
+            if let Some(parent_context) = &t.context.parent {
+                parent_context
                     .context
                     .borrow_mut()
                     .insert(identifier.to_string(), value);
-
-                Value::Expression(vec![Rc::new(inner_args)], t.context.clone())
+            } else {
+                todo!("No parent context found");
             }
-        },
+
+            Value::Expression(vec![Rc::new(args.unwrap())], t.context.clone())
+        }
         Token::Unit => Value::Unit,
         _ => todo!(),
+    }
+}
+
+fn apply_operator(operator: &Operator, children: &[Rc<Node>]) -> Value {
+    let mut iter = children.iter();
+    let first = flatten(iter.next().unwrap());
+
+    match operator {
+        Operator::Plus => iter.fold(first, |acc, child| acc + flatten(child)),
+        Operator::Minus => iter.fold(first, |acc, child| acc - flatten(child)),
+        //_ => todo!(),
     }
 }
 
