@@ -121,10 +121,10 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
     let mut current_node: Option<Rc<Node>> = None;
     let mut current_parent_node: Option<Rc<Node>> = None;
     let mut depth = 0;
-    let mut nodes: Vec<Rc<Node>> = Vec::new();
     let mut index = 0;
 
     let mut ctxnode = Rc::new(CtxNode::default());
+    let ctxnode_clone = ctxnode.clone();
 
     let mut idx = 0;
 
@@ -143,7 +143,8 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                 );
 
                 if let Some(ref c_n) = current_parent_node {
-                    c_n.children.borrow_mut().push(new_node.clone());
+                    println!("DEBUGGINGNNNN N {:?}", c_n)
+                    //c_n.children.borrow_mut().push(new_node.clone());
                 }
                 current_node = Some(new_node.clone());
                 current_parent_node = Some(new_node);
@@ -168,25 +169,32 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                 }
             }
             Token::OpenParenthesis => {
-                depth += 1;
-                index += 1;
-                let new_ctxnode = Rc::new(CtxNode::new(index).set_parent(Some(ctxnode)));
-
                 if tokens[idx + 1].token == Token::CloseParenthesis {
+                    // This will be a unit type. We can skip the next token
+                    // And add the parent directly.
+
                     let new_node = Rc::new(
                         Node::default()
                             .set_parent(current_parent_node.clone())
-                            .set_context(new_ctxnode.clone()),
+                            .set_context(ctxnode.clone()),
                     );
                     if let Some(c_n) = current_parent_node.clone() {
                         c_n.children.borrow_mut().push(new_node.clone());
                     }
-                    // This will be a unit type. We can skip the next token.
                     idx += 1;
-                    depth -= 1;
                     current_node = Some(new_node);
-                    ctxnode = new_ctxnode;
                 } else {
+                    depth += 1;
+                    index += 1;
+
+                    let new_ctxnode =
+                        Rc::new(CtxNode::new(index).set_parent(Some(ctxnode.clone())));
+
+                    if let Some(ref par_ctx_node) = ctxnode.parent {
+                        // I do not understand why this sill works don't delete.
+                        // Normally this should be critical... Right ?
+                        // par_ctx_node.children.borrow_mut().push(new_ctxnode.clone());
+                    }
                     current_node = None;
                     ctxnode = new_ctxnode;
                 }
@@ -195,9 +203,7 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                 depth -= 1;
 
                 if let Some(c_n) = current_node {
-                    if c_n.get_parent().is_none() {
-                        nodes.push(c_n.clone());
-                    } else {
+                    if c_n.get_parent().is_some() {
                         ctxnode
                             .expression
                             .swap(&RefCell::new(Some(c_n.get_parent().unwrap().clone())));
@@ -205,9 +211,9 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                     current_node = c_n.get_parent()
                 }
 
-                if let Some(ref cur_ctx_node) = ctxnode.parent {
-                    cur_ctx_node.children.borrow_mut().push(ctxnode.clone());
-                    ctxnode = ctxnode.parent.clone().unwrap()
+                if let Some(ref par_ctx_node) = ctxnode.parent {
+                    par_ctx_node.children.borrow_mut().push(ctxnode.clone());
+                    ctxnode = ctxnode.parent.clone().unwrap();
                 }
 
                 if depth < 0 {
@@ -233,11 +239,16 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
             _ => todo!(),
         }
         idx += 1;
+        println!("CURRENT  {:#?}", current_node);
+        println!("________________________________________________________________________");
     }
 
     if depth != 0 {
         todo!("bad parentheses ; depth = {:?}", depth)
     } else {
+        println!("________________________________________________________________________");
+        println!("________________________________________________________________________");
+        println!("________________________________________________________________________");
         ctxnode
     }
 }

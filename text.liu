@@ -1,5 +1,7 @@
 (
-    (def a () 4)
-    (def b () 8)
-    (+ a b 12)
+    (def a () 1)
+    (def b () 2)
+    (def c () b)
+    (def d () c)
+    (+ a b c d)
 )

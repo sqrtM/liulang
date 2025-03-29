@@ -134,10 +134,7 @@ impl Pipeline {
             ContextType::Interpreter(interpreter_context) => {
                 let mut visted: Vec<usize> = vec![];
 
-                println!(
-                    "BJDSKLFJSDLFHJKDSLHFJKSDLF {:#?}",
-                    interpreter_context.expression_data
-                );
+                println!("FIRST NODE IS : {:#?}", interpreter_context.expression_data);
 
                 let mut cur = interpreter_context.expression_data.clone();
                 let mut vals: Vec<Value> = vec![];

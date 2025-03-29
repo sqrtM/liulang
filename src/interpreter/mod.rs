@@ -27,14 +27,34 @@ pub fn flatten(t: &Rc<Node>) -> Value {
                 match &t.parent {
                     Some(par) => match &par.token {
                         Token::Keyword(keyword) => match keyword {
-                            // We are currently defining this value,
-                            // so return it as it.
-                            Keyword::Def => value,
+                            Keyword::Def => {
+                                // We are currently defining this value,
+                                // so return it as it.
+                                if t.parent
+                                    .as_ref()
+                                    .unwrap()
+                                    .children
+                                    .borrow()
+                                    .first()
+                                    .unwrap()
+                                    .token
+                                    == t.token
+                                {
+                                    value
+                                } else {
+                                    match resolve_variable(name, &t.context) {
+                                        Some(val) => val.clone(),
+                                        None => {
+                                            panic!("{:?}", t);
+                                        }
+                                    }
+                                }
+                            }
                         },
                         _ => match resolve_variable(name, &t.context) {
                             Some(val) => val.clone(),
                             None => {
-                                panic!("{:?}", name);
+                                panic!("{:?}", t);
                             }
                         },
                     },
@@ -45,13 +65,12 @@ pub fn flatten(t: &Rc<Node>) -> Value {
         },
         Token::Keyword(keyword) => match keyword {
             Keyword::Def => {
+                println!("beep");
                 let symbol = flatten(children.first().unwrap());
                 let identifier = match symbol {
                     Value::Identifier(identifier) => identifier,
                     _ => todo!("unexpected symbol"),
                 };
-
-                println!("88888888888888888888888888888888888888888888888888888");
 
                 let args: Option<Value> = match children.get(1) {
                     Some(arg) => match Some(flatten(arg)) {
@@ -69,6 +88,8 @@ pub fn flatten(t: &Rc<Node>) -> Value {
                     None => todo!(),
                 };
 
+                println!("flattening {:?}", children.get(2).unwrap());
+
                 let value = match children.get(2) {
                     Some(child) => flatten(child),
                     None => todo!(),
@@ -82,8 +103,7 @@ pub fn flatten(t: &Rc<Node>) -> Value {
                     .borrow_mut()
                     .insert(identifier.to_string(), value);
 
-                println!("999999 {:?}", t.context.parent.as_ref().unwrap().context);
-                println!("222222 {:?}", t.context.parent);
+                println!("defining {:?} in {:?}", identifier, t.context.parent);
 
                 Value::Expression(vec![Rc::new(inner_args)], t.context.clone())
             }
@@ -94,8 +114,7 @@ pub fn flatten(t: &Rc<Node>) -> Value {
 }
 
 fn resolve_variable(name: &String, node: &Rc<CtxNode>) -> Option<Value> {
-    println!("EEEEE {:?}", node);
-    println!("CCCCCCC {:?}", node.context);
+    println!("looking for {:?} in {:?}", name, node);
 
     if let Some(parent) = &node.parent {
         if let Some(res) = parent.context.borrow().get(name) {
