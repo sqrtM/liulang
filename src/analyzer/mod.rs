@@ -134,24 +134,20 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
 
         match tokens[idx].token.clone() {
             Token::Operator(operator) => {
-                if let Some(ref c_n) = current_parent_node {
-                    let n = Node::default()
-                        .set_token(Token::Operator(operator))
-                        .set_context(ctxnode.clone());
-                    let new_node = Rc::new(n.set_parent(Some(c_n.clone())));
+                let n = Node::default()
+                    .set_token(Token::Operator(operator))
+                    .set_context(ctxnode.clone());
+                let new_node =
+                    Rc::new(n.set_parent(current_parent_node.as_ref().map(|c_n| c_n.clone())));
 
+                if let Some(ref c_n) = current_parent_node {
                     c_n.children.borrow_mut().push(new_node.clone());
-                    current_node = Some(new_node.clone());
-                    current_parent_node = Some(new_node);
-                } else {
-                    let n = Node::default()
-                        .set_token(Token::Operator(operator))
-                        .set_context(ctxnode.clone());
-                    let new_node = Rc::new(n);
-                    current_node = Some(new_node.clone());
-                    current_parent_node = Some(new_node);
                 }
+
+                current_node = Some(new_node.clone());
+                current_parent_node = Some(new_node);
             }
+
             Token::Value(value) => {
                 if let Some(ref c_n) = current_parent_node {
                     let new_node = Rc::new(
@@ -214,9 +210,7 @@ pub fn expressionize(tokens: &[TokenData]) -> Rc<CtxNode> {
                 }
 
                 if let Some(ref c_p_n) = current_parent_node {
-                    if let Some(ref grand_parent_node) = c_p_n.get_parent() {
-                        current_parent_node = Some(grand_parent_node.clone())
-                    }
+                    current_parent_node = c_p_n.get_parent()
                 }
 
                 if depth < 0 {
