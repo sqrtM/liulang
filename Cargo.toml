@@ -1,6 +1,5 @@
 [package]
 name = "liulang"
-description = "流浪 - to drift about ; to wonder"
 version = "0.1.0"
 edition = "2024"
 
