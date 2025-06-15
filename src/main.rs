@@ -24,6 +24,8 @@ fn main() {
         .collect();
 
     let preparsed = preparser::preparse(&token_data, 0);
+    //println!("{:#?}", preparsed.0);
+
     let expressions = parse(preparsed.0);
 
     println!("{:#?}", expressions);

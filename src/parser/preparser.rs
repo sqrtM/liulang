@@ -39,6 +39,8 @@ impl ValueList {
         }
     }
 
+    // Useful for tests. Maybe useful elsewhere as well.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         match self {
             ValueList::Empty => 0,
@@ -57,6 +59,9 @@ impl ValueList {
     }
 }
 
+/// This produces a perfectly flat representation of the input source code.
+/// It's kind of like just replacing the paretheses in source with the brackets
+/// of arrays.
 pub fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
     let mut values: ValueList = ValueList::Empty;
     let mut current_list: ValueList = ValueList::Empty;

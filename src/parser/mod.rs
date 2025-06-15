@@ -75,6 +75,10 @@ pub enum Operand {
     Node(Node),
 }
 
+/// This takes in the preparsed flat input and transforms it into
+/// a parce tree, beginning with an entry point node (currently just
+/// the first expression in the source code) and producing parent-child
+/// relationships across all other expressions.
 pub(crate) fn parse(listed_values: ValueList) -> Node {
     let mut node = Node::default();
     for inner_value in &listed_values.unravel() {
@@ -85,7 +89,7 @@ pub(crate) fn parse(listed_values: ValueList) -> Node {
                     // This is kind of hokey and hard to get right. Checking for a valid operator
                     // during this phase makes it difficult to know what new operators will be
                     // added. Try and make this a bit more elegant.
-                    if node.get_operator() == Value::Unit && is_valid_operator(&identifier) {
+                    if node.get_operator() == Value::Unit && is_valid_operator(identifier) {
                         node.set_operator(Value::Identifier(identifier.clone()))
                     } else {
                         node.push_operand(Operand::Value(Value::Identifier(identifier.clone())))
@@ -100,11 +104,14 @@ pub(crate) fn parse(listed_values: ValueList) -> Node {
             _ => todo!(),
         };
     }
+    // ... maybe a thing where, before we send the node back, we say: "was this a
+    // def node ? did it have arguments ?" if yes, add it to a global function table,
+    // so it will henceforth it will be considered as a valid operator.
     node
 }
 
-fn is_valid_operator(op: &String) -> bool {
-    matches!(op.as_str(), "+")
+fn is_valid_operator(op: &str) -> bool {
+    matches!(op, "+" | "def")
 }
 
 #[cfg(test)]
@@ -120,13 +127,19 @@ mod tests {
             ValueList::Value(Value::Int(1)),
             ValueList::Value(Value::Int(2)),
         ]);
-        let value_list = parse(list);
+        let node = parse(list);
 
-        panic!("{:#?}", value_list);
+        assert_eq!(node.get_operator(), Value::Identifier(Rc::new("+".into())));
+        assert_eq!(node.get_operands().len(), 2);
+        assert_eq!(node.get_operands()[0], Operand::Value(Value::Int(1)));
+        assert_eq!(node.get_operands()[1], Operand::Value(Value::Int(2)));
     }
 
     #[test]
     fn test_parsing_def() {
+        // And here, we can test a global function table, and make sure that add is
+        // added (ha ha) to the global table, and then we can use it in place of the
+        // + in the test.
         let list = ValueList::List(vec![
             ValueList::Value(Value::Identifier(Rc::new("def".into()))),
             ValueList::Value(Value::Identifier(Rc::new("add".into()))),
@@ -140,8 +153,33 @@ mod tests {
                 ValueList::Value(Value::Identifier(Rc::new("b".into()))),
             ]),
         ]);
-        let value_list = parse(list);
+        let node = parse(list);
 
-        panic!("{:#?}", value_list);
+        assert_eq!(
+            node.get_operator(),
+            Value::Identifier(Rc::new("def".into()))
+        );
+        assert_eq!(node.get_operands().len(), 3);
+        assert_eq!(
+            node.get_operands()[0],
+            Operand::Value(Value::Identifier(Rc::new("add".into())))
+        );
+        assert_eq!(
+            node.get_operands()[1],
+            Operand::Node(Node::List(vec![
+                Operand::Value(Value::Identifier(Rc::new("a".into()))),
+                Operand::Value(Value::Identifier(Rc::new("b".into())))
+            ]))
+        );
+        assert_eq!(
+            node.get_operands()[2],
+            Operand::Node(Node::Operation(OperationNode {
+                operator: Value::Identifier(Rc::new("+".into())),
+                operands: vec![
+                    Operand::Value(Value::Identifier(Rc::new("a".into()))),
+                    Operand::Value(Value::Identifier(Rc::new("b".into())))
+                ]
+            }))
+        );
     }
 }
