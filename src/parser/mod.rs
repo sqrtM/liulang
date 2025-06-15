@@ -1,13 +1,9 @@
 use crate::tokenizer::TokenData;
-use std::collections::HashMap;
-use std::{
-    cell::RefCell,
-    fmt::{Debug, Formatter},
-    rc::Rc,
-};
-use std::{default, fmt};
+use std::fmt::Debug;
 
 use crate::tokenizer::{Token, Value};
+pub mod flattener;
+mod preparser;
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Node {
@@ -29,13 +25,11 @@ enum Operand {
     Node(Node),
 }
 
-pub(crate) fn expressionize(tokens: &[TokenData], idx: usize) -> (Node, usize) {
+pub(crate) fn parse(tokens: &[TokenData], idx: usize) -> (Node, usize) {
     let mut local_idx = idx;
 
     let mut node = Node::default();
     while local_idx < tokens.len() {
-        println!("{:?}", &tokens[idx].token);
-
         match &tokens[local_idx].token {
             Token::Value(value) => match value {
                 Value::Int(int) => {
@@ -63,7 +57,7 @@ pub(crate) fn expressionize(tokens: &[TokenData], idx: usize) -> (Node, usize) {
             },
             Token::OpenParenthesis => {
                 local_idx += 1;
-                let inner_nodes = expressionize(tokens, local_idx);
+                let inner_nodes = parse(tokens, local_idx);
                 node.operands.push(Operand::Node(inner_nodes.0));
                 local_idx = inner_nodes.1;
                 continue;
@@ -74,4 +68,31 @@ pub(crate) fn expressionize(tokens: &[TokenData], idx: usize) -> (Node, usize) {
         local_idx += 1;
     }
     (node, local_idx)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parsing() {
+        let tokens = vec![
+            TokenData::new("(", 0, 0),
+            TokenData::new("+", 0, 0),
+            TokenData::new("2", 0, 0),
+            TokenData::new("2", 0, 0),
+            TokenData::new(")", 0, 0),
+            TokenData::new("(", 0, 0),
+            TokenData::new("+", 0, 0),
+            TokenData::new("2", 0, 0),
+            TokenData::new("2", 0, 0),
+            TokenData::new(")", 0, 0),
+        ];
+        let (node, next_idx) = parse(&tokens, 0);
+
+        assert_eq!(next_idx, 10);
+        assert_eq!(node.operands.len(), 2);
+        assert_eq!(node.operator, Value::Unit);
+        assert_eq!(node.operands[0], node.operands[1]);
+    }
 }

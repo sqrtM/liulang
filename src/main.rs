@@ -3,7 +3,10 @@ use std::{
     io::{self, BufRead},
 };
 
-use crate::{parser::expressionize, tokenizer::TokenData};
+use crate::{
+    parser::{flattener::flatten, parse},
+    tokenizer::TokenData,
+};
 
 mod parser;
 mod tokenizer;
@@ -20,7 +23,11 @@ fn main() {
         .flat_map(|(i, line)| tokenizer::tokenize(line, i))
         .collect();
 
-    let expressions = expressionize(&token_data, 0);
+    let expressions = parse(&token_data, 0);
 
-    println!("{:?}", expressions);
+    println!("{:#?}", expressions);
+
+    let flattened = flatten(&expressions.0);
+
+    println!("{:#?}", flattened);
 }

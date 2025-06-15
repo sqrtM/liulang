@@ -1,7 +1,7 @@
 use std::{rc::Rc, str::FromStr};
 
 pub fn tokenize(line: &str, row: usize) -> std::vec::Vec<TokenData> {
-    LineToParse::new(line)
+    LineToTokenize::new(line)
         .map(|(raw_token, token_position)| {
             TokenData::new(
                 raw_token,
@@ -20,7 +20,7 @@ pub struct TokenData {
 }
 
 impl TokenData {
-    fn new(raw_token: &str, row: usize, position: usize) -> Self {
+    pub fn new(raw_token: &str, row: usize, position: usize) -> Self {
         Self {
             token: Token::new(raw_token),
             row,
@@ -120,17 +120,17 @@ impl FromStr for Value {
     }
 }
 
-pub struct LineToParse<'a> {
+pub struct LineToTokenize<'a> {
     line: &'a str,
 }
 
-impl<'a> LineToParse<'a> {
+impl<'a> LineToTokenize<'a> {
     fn new(line: &'a str) -> Self {
         Self { line }
     }
 }
 
-impl<'a> Iterator for LineToParse<'a> {
+impl<'a> Iterator for LineToTokenize<'a> {
     // The usize here, used to get the location of the problem char in case of error,
     // is the DISTANCE FROM THE END OF THE LINE. So some calculations have to be made
     // after the fact in order to get its real "location".
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn test_single_token() {
         let line = "token";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), Some(("token", 0)));
         assert_eq!(parser.next(), None);
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_multiple_tokens() {
         let line = "token1 token2 token3";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), Some(("token1", 14)));
         assert_eq!(parser.next(), Some(("token2", 7)));
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_leading_and_trailing_whitespace() {
         let line = "   token1   token2   ";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), Some(("token1", 12)));
         assert_eq!(parser.next(), Some(("token2", 3)));
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_unit_token() {
         let line = "def () token";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), Some(("def", 9)));
         assert_eq!(parser.next(), Some(("()", 6)));
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_complex_unit_tokens() {
         let line = "(def a () (+ 2 1))";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), Some(("(", 17)));
         assert_eq!(parser.next(), Some(("def", 14)));
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn test_empty_string() {
         let line = "";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), None);
     }
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn test_only_whitespace() {
         let line = "   ";
-        let mut parser = LineToParse::new(line);
+        let mut parser = LineToTokenize::new(line);
 
         assert_eq!(parser.next(), None);
     }
