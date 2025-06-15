@@ -1,54 +1,58 @@
-use crate::{
-    parse,
-    parser::{Node, Operand},
-    tokenizer::TokenData,
-};
+use crate::tokenizer::TokenData;
 
 use crate::tokenizer::{Token, Value};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum ValueList {
     Empty,
     Value(Value),
-    List(Vec<Value>),
+    List(Vec<ValueList>),
 }
 
 impl ValueList {
+    /// Push a Value into the current ValueList.
     fn push(&self, item: Value) -> ValueList {
         match self {
             ValueList::Empty => ValueList::Value(item),
-            ValueList::Value(value) => ValueList::List(vec![value.clone(), item]),
-            ValueList::List(value_lists) => {
-                let mut val = value_lists.clone();
-                val.push(item);
+            ValueList::Value(value) => ValueList::List(vec![
+                ValueList::Value(value.clone()),
+                ValueList::Value(item),
+            ]),
+            ValueList::List(list) => {
+                let mut val = list.clone();
+                val.push(ValueList::Value(item));
                 ValueList::List(val)
             }
         }
     }
 
+    /// Append a ValueList on to the end of self.
     fn append(&self, item: ValueList) -> ValueList {
         match self {
             ValueList::Empty => item,
-            ValueList::Value(value) => {
-                let mut v = vec![value.clone()];
-                v.extend(item.unravel());
-                ValueList::List(v)
-            }
-            ValueList::List(value_lists) => {
-                let mut val = value_lists.clone();
-                println!("{:?}", val);
-                val.extend(item.unravel());
-                println!("{:?}", val);
-                ValueList::List(val)
+            ValueList::Value(value) => ValueList::List(vec![ValueList::Value(value.clone()), item]),
+            ValueList::List(_) => {
+                let mut m = self.clone().unravel();
+                m.push(item);
+                ValueList::List(m)
             }
         }
     }
 
-    fn unravel(&self) -> Vec<Value> {
+    fn len(&self) -> usize {
         match self {
-            ValueList::Empty => Vec::new(),
-            ValueList::Value(value) => vec![value.clone()],
-            ValueList::List(value_lists) => value_lists.clone(),
+            ValueList::Empty => 0,
+            ValueList::Value(_) => 1,
+            ValueList::List(list) => list.len(),
+        }
+    }
+
+    /// Return the inner value as a Vec of ValueLists
+    fn unravel(&self) -> Vec<ValueList> {
+        match self {
+            ValueList::Empty => vec![ValueList::Empty],
+            ValueList::Value(_) => vec![self.clone()],
+            ValueList::List(list) => list.clone(),
         }
     }
 }
@@ -58,18 +62,15 @@ fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
     let mut current_list: ValueList = ValueList::Empty;
 
     while idx < tokens.len() {
-        println!("{:?}", &tokens[idx].token);
-        println!("{:?}", current_list);
-        println!("{:?}\n=============", values);
         match &tokens[idx].token {
             Token::Value(value) => {
                 current_list = current_list.push(value.clone());
             }
             Token::OpenParenthesis => {
                 idx += 1;
-                let inner_list = preparse(tokens, idx);
-                current_list = current_list.append(inner_list.0);
-                idx = inner_list.1;
+                let (inner_list, new_idx) = preparse(tokens, idx);
+                current_list = current_list.append(inner_list);
+                idx = new_idx;
                 continue;
             }
             Token::CloseParenthesis => {
@@ -95,51 +96,57 @@ mod tests {
     fn test_parsing() {
         let tokens = vec![
             TokenData::new("(", 0, 0),
-            TokenData::new("(", 0, 0),
             TokenData::new("+", 0, 0),
             TokenData::new("1", 0, 0),
             TokenData::new("2", 0, 0),
-            TokenData::new("a", 0, 0),
-            TokenData::new("b", 0, 0),
             TokenData::new(")", 0, 0),
+        ];
+        let (value_list, next_idx) = preparse(&tokens, 0);
+
+        assert_eq!(next_idx, 5);
+        assert_eq!(value_list.len(), 3);
+        assert_eq!(
+            value_list.unravel()[0],
+            ValueList::Value(Value::Identifier(Rc::new("+".into())))
+        );
+        assert_eq!(value_list.unravel()[1], ValueList::Value(Value::Int(1)));
+        assert_eq!(value_list.unravel()[2], ValueList::Value(Value::Int(2)));
+    }
+
+    #[test]
+    fn test_parsing_nested() {
+        let tokens = vec![
             TokenData::new("(", 0, 0),
             TokenData::new("+", 0, 0),
+            TokenData::new("1", 0, 0),
+            TokenData::new("(", 0, 0),
+            TokenData::new("+", 0, 0),
+            TokenData::new("2", 0, 0),
             TokenData::new("3", 0, 0),
-            TokenData::new("4", 0, 0),
             TokenData::new(")", 0, 0),
             TokenData::new(")", 0, 0),
         ];
-        let (node, next_idx) = preparse(&tokens, 0);
+        let (value_list, next_idx) = preparse(&tokens, 0);
 
-        panic!("{:?}", node)
-
-        // assert_eq!(next_idx, 4);
-        // assert_eq!(node.len(), 3);
-        // assert_eq!(node[0][0], Value::Identifier(Rc::new("+".into())));
-        // assert_eq!(node[0].len(), 1);
-        // assert_eq!(node[1][0], Value::Int(2));
-        // assert_eq!(node[1].len(), 1);
-        // assert_eq!(node[2][0], Value::Int(2));
-        // assert_eq!(node[2].len(), 1);
+        assert_eq!(next_idx, 9);
+        assert_eq!(value_list.len(), 3);
+        assert_eq!(
+            value_list.unravel()[0],
+            ValueList::Value(Value::Identifier(Rc::new("+".into())))
+        );
+        assert_eq!(value_list.unravel()[1], ValueList::Value(Value::Int(1)));
+        assert_eq!(value_list.unravel()[2].len(), 3);
+        assert_eq!(
+            value_list.unravel()[2].unravel()[0],
+            ValueList::Value(Value::Identifier(Rc::new("+".into())))
+        );
+        assert_eq!(
+            value_list.unravel()[2].unravel()[1],
+            ValueList::Value(Value::Int(2))
+        );
+        assert_eq!(
+            value_list.unravel()[2].unravel()[2],
+            ValueList::Value(Value::Int(3))
+        );
     }
 }
-
-//     #[test]
-//     fn test_parsing_nested() {
-//         let tokens = vec![
-//             TokenData::new("(", 0, 0),
-//             TokenData::new("+", 0, 0),
-//             TokenData::new("2", 0, 0),
-//             TokenData::new("(", 0, 0),
-//             TokenData::new("+", 0, 0),
-//             TokenData::new("2", 0, 0),
-//             TokenData::new("2", 0, 0),
-//             TokenData::new(")", 0, 0),
-//             TokenData::new(")", 0, 0),
-//         ];
-//         let (node, next_idx) = preparse(&tokens, 0);
-
-//         panic!("{:?}", node);
-//         assert_eq!(node.len(), 3);
-//     }
-// }
