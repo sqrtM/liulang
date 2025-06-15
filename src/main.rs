@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    parser::{flattener::flatten, parse},
+    parser::{parse, preparser},
     tokenizer::TokenData,
 };
 
@@ -23,11 +23,8 @@ fn main() {
         .flat_map(|(i, line)| tokenizer::tokenize(line, i))
         .collect();
 
-    let expressions = parse(&token_data, 0);
+    let preparsed = preparser::preparse(&token_data, 0);
+    let expressions = parse(preparsed.0);
 
     println!("{:#?}", expressions);
-
-    let flattened = flatten(&expressions.0);
-
-    println!("{:#?}", flattened);
 }

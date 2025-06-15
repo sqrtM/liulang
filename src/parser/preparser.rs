@@ -3,7 +3,7 @@ use crate::tokenizer::TokenData;
 use crate::tokenizer::{Token, Value};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-enum ValueList {
+pub enum ValueList {
     Empty,
     Value(Value),
     List(Vec<ValueList>),
@@ -11,7 +11,7 @@ enum ValueList {
 
 impl ValueList {
     /// Push a Value into the current ValueList.
-    fn push(&self, item: Value) -> ValueList {
+    pub fn push(&self, item: Value) -> ValueList {
         match self {
             ValueList::Empty => ValueList::Value(item),
             ValueList::Value(value) => ValueList::List(vec![
@@ -27,7 +27,7 @@ impl ValueList {
     }
 
     /// Append a ValueList on to the end of self.
-    fn append(&self, item: ValueList) -> ValueList {
+    pub fn append(&self, item: ValueList) -> ValueList {
         match self {
             ValueList::Empty => item,
             ValueList::Value(value) => ValueList::List(vec![ValueList::Value(value.clone()), item]),
@@ -39,7 +39,7 @@ impl ValueList {
         }
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         match self {
             ValueList::Empty => 0,
             ValueList::Value(_) => 1,
@@ -48,7 +48,7 @@ impl ValueList {
     }
 
     /// Return the inner value as a Vec of ValueLists
-    fn unravel(&self) -> Vec<ValueList> {
+    pub fn unravel(&self) -> Vec<ValueList> {
         match self {
             ValueList::Empty => vec![ValueList::Empty],
             ValueList::Value(_) => vec![self.clone()],
@@ -57,7 +57,7 @@ impl ValueList {
     }
 }
 
-fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
+pub fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
     let mut values: ValueList = ValueList::Empty;
     let mut current_list: ValueList = ValueList::Empty;
 

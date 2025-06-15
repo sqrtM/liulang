@@ -1,17 +1,67 @@
-use crate::tokenizer::TokenData;
+use crate::parser::preparser::ValueList;
 use std::fmt::Debug;
 
-use crate::tokenizer::{Token, Value};
-pub mod flattener;
-mod preparser;
+use crate::tokenizer::Value;
+//pub mod flattener;
+pub mod preparser;
 
-#[derive(PartialEq, Eq, Debug)]
-pub struct Node {
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Node {
+    Operation(OperationNode),
+    List(Vec<Operand>),
+    Empty,
+}
+
+impl Node {
+    fn set_operator(&mut self, operator: Value) -> Self {
+        Self::Operation(OperationNode {
+            operator,
+            operands: self.get_operands(),
+        })
+    }
+
+    fn get_operands(&self) -> Vec<Operand> {
+        match self {
+            Node::Operation(operation_node) => operation_node.operands.clone(),
+            Node::List(operands) => operands.to_vec(),
+            Node::Empty => Vec::new(),
+        }
+    }
+
+    fn push_operand(&self, operand: Operand) -> Self {
+        let mut joined_operands = self.get_operands().clone();
+        joined_operands.push(operand);
+        match self {
+            Node::Operation(operation_node) => Self::Operation(OperationNode {
+                operator: operation_node.operator.clone(),
+                operands: joined_operands,
+            }),
+            _ => Self::List(joined_operands),
+        }
+    }
+
+    fn get_operator(&self) -> Value {
+        match self {
+            Node::Operation(operation_node) => operation_node.operator.clone(),
+            Node::List(_) => Value::Unit,
+            Node::Empty => Value::Unit,
+        }
+    }
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct OperationNode {
     pub operator: Value,
     pub operands: Vec<Operand>,
 }
 
-impl Default for Node {
+impl Default for OperationNode {
     fn default() -> Self {
         Self {
             operator: Value::Unit,
@@ -19,80 +69,79 @@ impl Default for Node {
         }
     }
 }
-#[derive(PartialEq, Eq, Debug)]
-enum Operand {
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Operand {
     Value(Value),
     Node(Node),
 }
 
-pub(crate) fn parse(tokens: &[TokenData], idx: usize) -> (Node, usize) {
-    let mut local_idx = idx;
-
+pub(crate) fn parse(listed_values: ValueList) -> Node {
     let mut node = Node::default();
-    while local_idx < tokens.len() {
-        match &tokens[local_idx].token {
-            Token::Value(value) => match value {
-                Value::Int(int) => {
-                    if node.operator == Value::Unit {
-                        todo!("not valid  with operator")
-                    } else {
-                        node.operands.push(Operand::Value(Value::Int(*int)));
-                    }
-                }
+    for inner_value in &listed_values.unravel() {
+        node = match inner_value {
+            ValueList::Value(value) => match value {
+                Value::Int(int) => node.push_operand(Operand::Value(Value::Int(*int))),
                 Value::Identifier(identifier) => {
-                    if node.operator == Value::Unit {
-                        node.operator = Value::Identifier(identifier.clone());
+                    // This is kind of hokey and hard to get right. Checking for a valid operator
+                    // during this phase makes it difficult to know what new operators will be
+                    // added. Try and make this a bit more elegant.
+                    if node.get_operator() == Value::Unit && is_valid_operator(&identifier) {
+                        node.set_operator(Value::Identifier(identifier.clone()))
                     } else {
-                        node.operands
-                            .push(Operand::Value(Value::Identifier(identifier.clone())));
+                        node.push_operand(Operand::Value(Value::Identifier(identifier.clone())))
                     }
                 }
-                Value::Unit => {
-                    if node.operator == Value::Unit {
-                        todo!("not valid  with operator")
-                    } else {
-                        node.operands.push(Operand::Value(Value::Unit));
-                    }
-                }
+                Value::Unit => node.push_operand(Operand::Value(Value::Unit)),
             },
-            Token::OpenParenthesis => {
-                local_idx += 1;
-                let inner_nodes = parse(tokens, local_idx);
-                node.operands.push(Operand::Node(inner_nodes.0));
-                local_idx = inner_nodes.1;
-                continue;
+            ValueList::List(list) => {
+                let inner_nodes = parse(ValueList::List(list.clone()));
+                node.push_operand(Operand::Node(inner_nodes))
             }
-            Token::CloseParenthesis => return (node, local_idx + 1),
-            Token::TokenizationError(_) => todo!(),
-        }
-        local_idx += 1;
+            _ => todo!(),
+        };
     }
-    (node, local_idx)
+    node
+}
+
+fn is_valid_operator(op: &String) -> bool {
+    matches!(op.as_str(), "+")
 }
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::*;
 
     #[test]
     fn test_parsing() {
-        let tokens = vec![
-            TokenData::new("(", 0, 0),
-            TokenData::new("+", 0, 0),
-            TokenData::new("2", 0, 0),
-            TokenData::new("2", 0, 0),
-            TokenData::new(")", 0, 0),
-            TokenData::new("(", 0, 0),
-            TokenData::new("+", 0, 0),
-            TokenData::new("2", 0, 0),
-            TokenData::new("2", 0, 0),
-            TokenData::new(")", 0, 0),
-        ];
-        let (node, next_idx) = parse(&tokens, 0);
+        let list = ValueList::List(vec![
+            ValueList::Value(Value::Identifier(Rc::new("+".into()))),
+            ValueList::Value(Value::Int(1)),
+            ValueList::Value(Value::Int(2)),
+        ]);
+        let value_list = parse(list);
 
-        assert_eq!(next_idx, 10);
-        assert_eq!(node.operands.len(), 2);
-        assert_eq!(node.operator, Value::Unit);
-        assert_eq!(node.operands[0], node.operands[1]);
+        panic!("{:#?}", value_list);
+    }
+
+    #[test]
+    fn test_parsing_def() {
+        let list = ValueList::List(vec![
+            ValueList::Value(Value::Identifier(Rc::new("def".into()))),
+            ValueList::Value(Value::Identifier(Rc::new("add".into()))),
+            ValueList::List(vec![
+                ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+            ]),
+            ValueList::List(vec![
+                ValueList::Value(Value::Identifier(Rc::new("+".into()))),
+                ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+            ]),
+        ]);
+        let value_list = parse(list);
+
+        panic!("{:#?}", value_list);
     }
 }

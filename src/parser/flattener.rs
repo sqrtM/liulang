@@ -1,11 +1,11 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, Node, Operand},
+    parser::{self, Operand, OperationNode},
     tokenizer::Value,
 };
 
-pub fn flatten(node: &Node) -> Node {
+pub fn flatten(node: &OperationNode) -> OperationNode {
     let operands = node
         .operands
         .iter()
@@ -14,13 +14,13 @@ pub fn flatten(node: &Node) -> Node {
             parser::Operand::Node(node) => parser::Operand::Node(flatten(node)),
         })
         .collect();
-    Node {
+    OperationNode {
         operator: node.operator.clone(),
         operands,
     }
 }
 
-pub fn define_identifiers(node: &Node) -> Node {
+pub fn define_identifiers(node: &OperationNode) -> OperationNode {
     // match node.operator {
     //     Value::Int(_) => todo!("this probably should not even be possible..."),
     //     Value::Identifier(identifier) => if identifier == "def".to_string().into() {},
@@ -35,7 +35,7 @@ pub fn define_identifiers(node: &Node) -> Node {
             parser::Operand::Node(node) => parser::Operand::Node(flatten(node)),
         })
         .collect();
-    Node {
+    OperationNode {
         operator: node.operator.clone(),
         operands,
     }
@@ -43,13 +43,13 @@ pub fn define_identifiers(node: &Node) -> Node {
 
 struct SymbolDefinition {
     args: Vec<String>,
-    def: Node,
+    def: OperationNode,
 }
 
 fn hjhdsfkh() {
     let mut symbol_table: HashMap<String, SymbolDefinition> = HashMap::new();
     let args = vec!["a".to_string(), "b".to_string()];
-    let def = Node {
+    let def = OperationNode {
         operator: Value::Identifier(Rc::new("+".into())),
         operands: vec![
             Operand::Value(Value::Identifier(Rc::new("a".into()))),
