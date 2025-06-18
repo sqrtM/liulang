@@ -32,7 +32,22 @@ impl ValueList {
             ValueList::Empty => item,
             ValueList::Value(value) => ValueList::List(vec![ValueList::Value(value.clone()), item]),
             ValueList::List(_) => {
-                let mut m = self.clone().unravel();
+                // let mut m: Vec<ValueList> = self.clone().unravel();
+                // println!("before {:?}", m);
+                // m.push(item);
+                // println!("after {:?}", ValueList::List(m.clone()));
+                // ValueList::List(m)
+                Self::List(vec![self.clone(), item])
+            }
+        }
+    }
+
+    pub fn extend(&self, item: ValueList) -> ValueList {
+        match self {
+            ValueList::Empty => item,
+            ValueList::Value(value) => ValueList::List(vec![ValueList::Value(value.clone()), item]),
+            ValueList::List(_) => {
+                let mut m: Vec<ValueList> = self.clone().unravel();
                 m.push(item);
                 ValueList::List(m)
             }
@@ -63,32 +78,36 @@ impl ValueList {
 /// It's kind of like just replacing the paretheses in source with the brackets
 /// of arrays.
 pub fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
-    let mut values: ValueList = ValueList::Empty;
     let mut current_list: ValueList = ValueList::Empty;
 
     while idx < tokens.len() {
+        println!("{:?} {:?}", current_list, &tokens[idx].token);
         match &tokens[idx].token {
             Token::Value(value) => {
                 current_list = current_list.push(value.clone());
             }
             Token::OpenParenthesis => {
+                let previous_token = tokens.get(idx.wrapping_sub(1)).map(|t| &t.token);
+
                 idx += 1;
                 let (inner_list, new_idx) = preparse(tokens, idx);
-                current_list = current_list.append(inner_list);
+
+                current_list = match previous_token {
+                    Some(&Token::CloseParenthesis) => current_list.append(inner_list),
+                    _ => current_list.extend(inner_list),
+                };
                 idx = new_idx;
                 continue;
             }
             Token::CloseParenthesis => {
-                values = values.append(current_list);
-                idx += 1;
-                return (values, idx);
+                return (current_list, idx + 1);
             }
             Token::TokenizationError(_) => todo!(),
         };
         idx += 1;
     }
-    values = values.append(current_list);
-    (values, idx)
+
+    (current_list, idx)
 }
 
 #[cfg(test)]
@@ -155,32 +174,53 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_parsing_multiple() {
-    //     let tokens = vec![
-    //         TokenData::new("(", 0, 0),
-    //         TokenData::new("(", 0, 0),
-    //         TokenData::new("+", 0, 0),
-    //         TokenData::new("1", 0, 0),
-    //         TokenData::new("2", 0, 0),
-    //         TokenData::new(")", 0, 0),
-    //         TokenData::new("(", 0, 0),
-    //         TokenData::new("+", 0, 0),
-    //         TokenData::new("3", 0, 0),
-    //         TokenData::new("4", 0, 0),
-    //         TokenData::new(")", 0, 0),
-    //         TokenData::new(")", 0, 0),
-    //     ];
-    //     let (value_list, next_idx) = preparse(&tokens, 0);
+    #[test]
+    fn test_parsing_multiple() {
+        let tokens = vec![
+            TokenData::new("(", 0, 0),
+            TokenData::new("(", 0, 0),
+            TokenData::new("+", 0, 0),
+            TokenData::new("1", 0, 0),
+            TokenData::new("2", 0, 0),
+            TokenData::new(")", 0, 0),
+            TokenData::new("(", 0, 0),
+            TokenData::new("+", 0, 0),
+            TokenData::new("3", 0, 0),
+            TokenData::new("4", 0, 0),
+            TokenData::new(")", 0, 0),
+            TokenData::new(")", 0, 0),
+        ];
+        let (value_list, next_idx) = preparse(&tokens, 0);
 
-    //     assert_eq!(next_idx, 12);
-    //     panic!("{:#?}", value_list);
-    //     assert_eq!(value_list.len(), 2);
-    //     assert_eq!(
-    //         value_list.unravel()[0],
-    //         ValueList::Value(Value::Identifier(Rc::new("+".into())))
-    //     );
-    //     assert_eq!(value_list.unravel()[1], ValueList::Value(Value::Int(1)));
-    //     assert_eq!(value_list.unravel()[2], ValueList::Value(Value::Int(2)));
-    // }
+        assert_eq!(next_idx, 12);
+        assert_eq!(value_list.len(), 2);
+
+        assert_eq!(value_list.unravel()[0].len(), 3);
+        assert_eq!(
+            value_list.unravel()[0].unravel()[0],
+            ValueList::Value(Value::Identifier(Rc::new("+".into())))
+        );
+        assert_eq!(
+            value_list.unravel()[0].unravel()[1],
+            ValueList::Value(Value::Int(1))
+        );
+        assert_eq!(
+            value_list.unravel()[0].unravel()[2],
+            ValueList::Value(Value::Int(2))
+        );
+
+        assert_eq!(value_list.unravel()[1].len(), 3);
+        assert_eq!(
+            value_list.unravel()[1].unravel()[0],
+            ValueList::Value(Value::Identifier(Rc::new("+".into())))
+        );
+        assert_eq!(
+            value_list.unravel()[1].unravel()[1],
+            ValueList::Value(Value::Int(3))
+        );
+        assert_eq!(
+            value_list.unravel()[1].unravel()[2],
+            ValueList::Value(Value::Int(4))
+        );
+    }
 }
