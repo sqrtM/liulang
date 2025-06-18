@@ -26,28 +26,12 @@ impl ValueList {
         }
     }
 
-    /// Append a ValueList on to the end of self.
-    pub fn append(&self, item: ValueList) -> ValueList {
-        match self {
-            ValueList::Empty => item,
-            ValueList::Value(value) => ValueList::List(vec![ValueList::Value(value.clone()), item]),
-            ValueList::List(_) => {
-                // let mut m: Vec<ValueList> = self.clone().unravel();
-                // println!("before {:?}", m);
-                // m.push(item);
-                // println!("after {:?}", ValueList::List(m.clone()));
-                // ValueList::List(m)
-                Self::List(vec![self.clone(), item])
-            }
-        }
-    }
-
     pub fn extend(&self, item: ValueList) -> ValueList {
         match self {
-            ValueList::Empty => item,
+            ValueList::Empty => ValueList::List(vec![item]),
             ValueList::Value(value) => ValueList::List(vec![ValueList::Value(value.clone()), item]),
-            ValueList::List(_) => {
-                let mut m: Vec<ValueList> = self.clone().unravel();
+            ValueList::List(list) => {
+                let mut m = list.clone();
                 m.push(item);
                 ValueList::List(m)
             }
@@ -81,26 +65,21 @@ pub fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
     let mut current_list: ValueList = ValueList::Empty;
 
     while idx < tokens.len() {
-        println!("{:?} {:?}", current_list, &tokens[idx].token);
+        println!("{:#?}", current_list);
         match &tokens[idx].token {
             Token::Value(value) => {
                 current_list = current_list.push(value.clone());
             }
             Token::OpenParenthesis => {
-                let previous_token = tokens.get(idx.wrapping_sub(1)).map(|t| &t.token);
+                let (inner_list, new_idx) = preparse(tokens, idx + 1);
 
-                idx += 1;
-                let (inner_list, new_idx) = preparse(tokens, idx);
-
-                current_list = match previous_token {
-                    Some(&Token::CloseParenthesis) => current_list.append(inner_list),
-                    _ => current_list.extend(inner_list),
-                };
+                current_list = current_list.extend(inner_list);
                 idx = new_idx;
                 continue;
             }
             Token::CloseParenthesis => {
-                return (current_list, idx + 1);
+                idx += 1;
+                break;
             }
             Token::TokenizationError(_) => todo!(),
         };
@@ -192,6 +171,8 @@ mod tests {
         ];
         let (value_list, next_idx) = preparse(&tokens, 0);
 
+        panic!("{:#?}", value_list);
+
         assert_eq!(next_idx, 12);
         assert_eq!(value_list.len(), 2);
 
@@ -222,5 +203,38 @@ mod tests {
             value_list.unravel()[1].unravel()[2],
             ValueList::Value(Value::Int(4))
         );
+    }
+
+    // Test breaks because the append/extend distinction above.
+    // The other tests at least pass.
+    // This one tries to put the function body on the same "depth"
+    // as the function definition itself (see output).
+    // this probably comes from the goofy return when we encounter a close parenthese.
+    // it would probably be better to rework the function as something purely functional
+    // rather than a loop with weird early returns.
+    #[test]
+    fn test_parsing_def_function() {
+        let tokens = vec![
+            TokenData::new("(", 0, 0),
+            TokenData::new("def", 0, 0),
+            TokenData::new("add", 0, 0),
+            TokenData::new("(", 0, 0),
+            TokenData::new("a", 0, 0),
+            TokenData::new("b", 0, 0),
+            TokenData::new(")", 0, 0),
+            TokenData::new("(", 0, 0),
+            TokenData::new("+", 0, 0),
+            TokenData::new("a", 0, 0),
+            TokenData::new("b", 0, 0),
+            TokenData::new(")", 0, 0),
+            TokenData::new(")", 0, 0),
+        ];
+        let (value_list, next_idx) = preparse(&tokens, 0);
+
+        assert_eq!(next_idx, 13);
+        panic!("{:#?}", value_list);
+
+        // The panic is because the output is visibly wrong and easy to diagnose at a glance.
+        // ensure that "def", "add", "(a b)", and (+ a b) are all on the same "scope level".
     }
 }

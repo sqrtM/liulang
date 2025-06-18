@@ -6,10 +6,14 @@ use crate::{
 };
 
 pub(crate) fn find_operator(node: &Node) -> Option<String> {
+    //println!("{:?}, {:?}", node.get_operator(), node.get_operands());
+
     if node.get_operator() == Value::Identifier(Rc::new("def".into()))
         && node.get_operands().len() == 3
     {
         let operands = node.get_operands();
+
+        //  println!("{:?}", operands);
 
         let identifier_node = operands.get(0);
         let args_node = operands.get(1);
@@ -24,8 +28,14 @@ pub(crate) fn find_operator(node: &Node) -> Option<String> {
             Operand::Node(n) => todo!("not valid 1 == {:?}", n),
         });
 
+        //println!("{:?}", identifier);
+
         let _args_node_is_valid = args_node.and_then(|args| match args {
-            Operand::Value(_) => todo!("not valid yet(?)"),
+            Operand::Value(v) => match v {
+                Value::Int(_) => todo!("int not valid"),
+                Value::Identifier(_) => todo!("not valid alone"),
+                Value::Unit => None,
+            },
             Operand::Node(node) => match node {
                 Node::Operation(_) => todo!("not valid"),
                 Node::List(operands) => Some(operands),
@@ -33,8 +43,10 @@ pub(crate) fn find_operator(node: &Node) -> Option<String> {
             },
         });
 
+        println!("{:?}", identifier);
+
         let _definition_node_is_valid = definition_node.and_then(|args| match args {
-            Operand::Value(_) => todo!("not valid yet(?)"),
+            Operand::Value(_) => None,
             Operand::Node(node) => match node {
                 Node::Operation(operation_node) => Some(operation_node),
                 Node::List(_) => None,
