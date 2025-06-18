@@ -113,9 +113,12 @@ impl FromStr for Value {
     type Err = ParseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.parse::<i64>() {
-            Ok(res) => Ok(Self::Int(res)),
-            Err(_) => Ok(Self::Identifier(Rc::new(s.to_string()))),
+        if s == "()" {
+            Ok(Value::Unit)
+        } else if let Ok(i) = s.parse::<i64>() {
+            Ok(Value::Int(i))
+        } else {
+            Ok(Value::Identifier(Rc::new(s.into())))
         }
     }
 }

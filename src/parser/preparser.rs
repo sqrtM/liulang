@@ -154,4 +154,33 @@ mod tests {
             ValueList::Value(Value::Int(3))
         );
     }
+
+    // #[test]
+    // fn test_parsing_multiple() {
+    //     let tokens = vec![
+    //         TokenData::new("(", 0, 0),
+    //         TokenData::new("(", 0, 0),
+    //         TokenData::new("+", 0, 0),
+    //         TokenData::new("1", 0, 0),
+    //         TokenData::new("2", 0, 0),
+    //         TokenData::new(")", 0, 0),
+    //         TokenData::new("(", 0, 0),
+    //         TokenData::new("+", 0, 0),
+    //         TokenData::new("3", 0, 0),
+    //         TokenData::new("4", 0, 0),
+    //         TokenData::new(")", 0, 0),
+    //         TokenData::new(")", 0, 0),
+    //     ];
+    //     let (value_list, next_idx) = preparse(&tokens, 0);
+
+    //     assert_eq!(next_idx, 12);
+    //     panic!("{:#?}", value_list);
+    //     assert_eq!(value_list.len(), 2);
+    //     assert_eq!(
+    //         value_list.unravel()[0],
+    //         ValueList::Value(Value::Identifier(Rc::new("+".into())))
+    //     );
+    //     assert_eq!(value_list.unravel()[1], ValueList::Value(Value::Int(1)));
+    //     assert_eq!(value_list.unravel()[2], ValueList::Value(Value::Int(2)));
+    // }
 }

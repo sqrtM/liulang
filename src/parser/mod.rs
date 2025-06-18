@@ -1,8 +1,9 @@
-use crate::parser::preparser::ValueList;
+use crate::parser::{find_operator::find_operator, preparser::ValueList};
 use std::fmt::Debug;
 
 use crate::tokenizer::Value;
 //pub mod flattener;
+pub mod find_operator;
 pub mod preparser;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -79,7 +80,7 @@ pub enum Operand {
 /// a parce tree, beginning with an entry point node (currently just
 /// the first expression in the source code) and producing parent-child
 /// relationships across all other expressions.
-pub(crate) fn parse(listed_values: ValueList) -> Node {
+pub(crate) fn parse(listed_values: ValueList, mut symbols: Vec<String>) -> (Node, Option<String>) {
     let mut node = Node::default();
     for inner_value in &listed_values.unravel() {
         node = match inner_value {
@@ -98,7 +99,11 @@ pub(crate) fn parse(listed_values: ValueList) -> Node {
                 Value::Unit => node.push_operand(Operand::Value(Value::Unit)),
             },
             ValueList::List(list) => {
-                let inner_nodes = parse(ValueList::List(list.clone()));
+                let (inner_nodes, maybe_symbol) =
+                    parse(ValueList::List(list.clone()), symbols.clone());
+                if let Some(symbol) = maybe_symbol {
+                    symbols.push(symbol);
+                }
                 node.push_operand(Operand::Node(inner_nodes))
             }
             _ => todo!(),
@@ -107,7 +112,9 @@ pub(crate) fn parse(listed_values: ValueList) -> Node {
     // ... maybe a thing where, before we send the node back, we say: "was this a
     // def node ? did it have arguments ?" if yes, add it to a global function table,
     // so it will henceforth it will be considered as a valid operator.
-    node
+
+    println!("{:?}", symbols);
+    (node.clone(), find_operator(&node))
 }
 
 fn is_valid_operator(op: &str) -> bool {
@@ -127,7 +134,7 @@ mod tests {
             ValueList::Value(Value::Int(1)),
             ValueList::Value(Value::Int(2)),
         ]);
-        let node = parse(list);
+        let (node, _) = parse(list, Vec::new());
 
         assert_eq!(node.get_operator(), Value::Identifier(Rc::new("+".into())));
         assert_eq!(node.get_operands().len(), 2);
@@ -153,7 +160,7 @@ mod tests {
                 ValueList::Value(Value::Identifier(Rc::new("b".into()))),
             ]),
         ]);
-        let node = parse(list);
+        let (node, _) = parse(list, Vec::new());
 
         assert_eq!(
             node.get_operator(),
