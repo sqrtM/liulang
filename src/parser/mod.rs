@@ -113,7 +113,7 @@ pub(crate) fn parse(listed_values: ValueList, mut symbols: Vec<String>) -> (Node
     // def node ? did it have arguments ?" if yes, add it to a global function table,
     // so it will henceforth it will be considered as a valid operator.
 
-    println!("{:?}", symbols);
+    println!("{symbols:?}");
     (node.clone(), find_operator(&node))
 }
 

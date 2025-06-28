@@ -15,7 +15,7 @@ pub(crate) fn find_operator(node: &Node) -> Option<String> {
 
         //  println!("{:?}", operands);
 
-        let identifier_node = operands.get(0);
+        let identifier_node = operands.first();
         let args_node = operands.get(1);
         let definition_node = operands.get(2);
 
@@ -43,7 +43,7 @@ pub(crate) fn find_operator(node: &Node) -> Option<String> {
             },
         });
 
-        println!("{:?}", identifier);
+        println!("{identifier:?}");
 
         let _definition_node_is_valid = definition_node.and_then(|args| match args {
             Operand::Value(_) => None,
@@ -58,7 +58,7 @@ pub(crate) fn find_operator(node: &Node) -> Option<String> {
             .map(|args| !args.is_empty())
             .unwrap_or(false)
         {
-            return identifier.and_then(|id| Some(id.as_str().to_string()));
+            return identifier.map(|id| id.as_str().to_string());
         }
         None
     } else {

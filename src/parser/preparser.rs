@@ -26,6 +26,7 @@ impl ValueList {
         }
     }
 
+    // Push a ValueList into the current ValueList
     pub fn extend(&self, item: ValueList) -> ValueList {
         match self {
             ValueList::Empty => ValueList::List(vec![item]),
@@ -38,22 +39,12 @@ impl ValueList {
         }
     }
 
-    // Useful for tests. Maybe useful elsewhere as well.
-    #[allow(dead_code)]
-    pub fn len(&self) -> usize {
-        match self {
-            ValueList::Empty => 0,
-            ValueList::Value(_) => 1,
-            ValueList::List(list) => list.len(),
-        }
-    }
-
     /// Return the inner value as a Vec of ValueLists
-    pub fn unravel(&self) -> Vec<ValueList> {
+    pub fn unravel(&self) -> Vec<&ValueList> {
         match self {
-            ValueList::Empty => vec![ValueList::Empty],
-            ValueList::Value(_) => vec![self.clone()],
-            ValueList::List(list) => list.clone(),
+            ValueList::Empty => vec![&ValueList::Empty],
+            ValueList::Value(_) => vec![self],
+            ValueList::List(list) => list.iter().collect(),
         }
     }
 }
@@ -65,7 +56,6 @@ pub fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
     let mut current_list: ValueList = ValueList::Empty;
 
     while idx < tokens.len() {
-        println!("{:#?}", current_list);
         match &tokens[idx].token {
             Token::Value(value) => {
                 current_list = current_list.push(value.clone());
@@ -91,9 +81,27 @@ pub fn preparse(tokens: &[TokenData], mut idx: usize) -> (ValueList, usize) {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{ops::Index, rc::Rc};
 
     use super::*;
+
+    impl Index<usize> for ValueList {
+        type Output = Self;
+
+        fn index(&self, index: usize) -> &Self::Output {
+            self.unravel()[index]
+        }
+    }
+
+    impl ValueList {
+        fn len(&self) -> usize {
+            match self {
+                ValueList::Empty => 0,
+                ValueList::Value(_) => 1,
+                ValueList::List(list) => list.len(),
+            }
+        }
+    }
 
     #[test]
     fn test_parsing() {
@@ -107,13 +115,14 @@ mod tests {
         let (value_list, next_idx) = preparse(&tokens, 0);
 
         assert_eq!(next_idx, 5);
-        assert_eq!(value_list.len(), 3);
+        assert_eq!(value_list.len(), 1);
+        assert_eq!(value_list[0].len(), 3);
         assert_eq!(
-            value_list.unravel()[0],
+            value_list[0][0],
             ValueList::Value(Value::Identifier(Rc::new("+".into())))
         );
-        assert_eq!(value_list.unravel()[1], ValueList::Value(Value::Int(1)));
-        assert_eq!(value_list.unravel()[2], ValueList::Value(Value::Int(2)));
+        assert_eq!(value_list[0][1], ValueList::Value(Value::Int(1)));
+        assert_eq!(value_list[0][2], ValueList::Value(Value::Int(2)));
     }
 
     #[test]
@@ -132,25 +141,19 @@ mod tests {
         let (value_list, next_idx) = preparse(&tokens, 0);
 
         assert_eq!(next_idx, 9);
-        assert_eq!(value_list.len(), 3);
+        assert_eq!(value_list.len(), 1);
         assert_eq!(
-            value_list.unravel()[0],
+            value_list[0][0],
             ValueList::Value(Value::Identifier(Rc::new("+".into())))
         );
-        assert_eq!(value_list.unravel()[1], ValueList::Value(Value::Int(1)));
-        assert_eq!(value_list.unravel()[2].len(), 3);
+        assert_eq!(value_list[0][1], ValueList::Value(Value::Int(1)));
+        assert_eq!(value_list[0][2].len(), 3);
         assert_eq!(
-            value_list.unravel()[2].unravel()[0],
+            value_list[0][2][0],
             ValueList::Value(Value::Identifier(Rc::new("+".into())))
         );
-        assert_eq!(
-            value_list.unravel()[2].unravel()[1],
-            ValueList::Value(Value::Int(2))
-        );
-        assert_eq!(
-            value_list.unravel()[2].unravel()[2],
-            ValueList::Value(Value::Int(3))
-        );
+        assert_eq!(value_list[0][2][1], ValueList::Value(Value::Int(2)));
+        assert_eq!(value_list[0][2][2], ValueList::Value(Value::Int(3)));
     }
 
     #[test]
@@ -171,47 +174,27 @@ mod tests {
         ];
         let (value_list, next_idx) = preparse(&tokens, 0);
 
-        panic!("{:#?}", value_list);
-
         assert_eq!(next_idx, 12);
-        assert_eq!(value_list.len(), 2);
+        assert_eq!(value_list.len(), 1);
 
-        assert_eq!(value_list.unravel()[0].len(), 3);
+        assert_eq!(value_list[0].len(), 2);
+        assert_eq!(value_list[0][0].len(), 3);
         assert_eq!(
-            value_list.unravel()[0].unravel()[0],
+            value_list[0][0][0],
             ValueList::Value(Value::Identifier(Rc::new("+".into())))
         );
-        assert_eq!(
-            value_list.unravel()[0].unravel()[1],
-            ValueList::Value(Value::Int(1))
-        );
-        assert_eq!(
-            value_list.unravel()[0].unravel()[2],
-            ValueList::Value(Value::Int(2))
-        );
+        assert_eq!(value_list[0][0][1], ValueList::Value(Value::Int(1)));
+        assert_eq!(value_list[0][0][2], ValueList::Value(Value::Int(2)));
 
-        assert_eq!(value_list.unravel()[1].len(), 3);
+        assert_eq!(value_list[0][1].len(), 3);
         assert_eq!(
-            value_list.unravel()[1].unravel()[0],
+            value_list[0][1][0],
             ValueList::Value(Value::Identifier(Rc::new("+".into())))
         );
-        assert_eq!(
-            value_list.unravel()[1].unravel()[1],
-            ValueList::Value(Value::Int(3))
-        );
-        assert_eq!(
-            value_list.unravel()[1].unravel()[2],
-            ValueList::Value(Value::Int(4))
-        );
+        assert_eq!(value_list[0][1][1], ValueList::Value(Value::Int(3)));
+        assert_eq!(value_list[0][1][2], ValueList::Value(Value::Int(4)));
     }
 
-    // Test breaks because the append/extend distinction above.
-    // The other tests at least pass.
-    // This one tries to put the function body on the same "depth"
-    // as the function definition itself (see output).
-    // this probably comes from the goofy return when we encounter a close parenthese.
-    // it would probably be better to rework the function as something purely functional
-    // rather than a loop with weird early returns.
     #[test]
     fn test_parsing_def_function() {
         let tokens = vec![
@@ -232,9 +215,43 @@ mod tests {
         let (value_list, next_idx) = preparse(&tokens, 0);
 
         assert_eq!(next_idx, 13);
-        panic!("{:#?}", value_list);
+        assert_eq!(value_list.len(), 1);
 
-        // The panic is because the output is visibly wrong and easy to diagnose at a glance.
-        // ensure that "def", "add", "(a b)", and (+ a b) are all on the same "scope level".
+        assert_eq!(value_list[0].len(), 4);
+        assert_eq!(value_list[0][0].len(), 1);
+        assert_eq!(
+            value_list[0][0],
+            ValueList::Value(Value::Identifier(Rc::new("def".into())))
+        );
+
+        assert_eq!(value_list[0][1].len(), 1);
+        assert_eq!(
+            value_list[0][1],
+            ValueList::Value(Value::Identifier(Rc::new("add".into())))
+        );
+
+        assert_eq!(value_list[0][2].len(), 2);
+        assert_eq!(
+            value_list[0][2][0],
+            ValueList::Value(Value::Identifier(Rc::new("a".into())))
+        );
+        assert_eq!(
+            value_list[0][2][1],
+            ValueList::Value(Value::Identifier(Rc::new("b".into())))
+        );
+
+        assert_eq!(value_list[0][3].len(), 3);
+        assert_eq!(
+            value_list[0][3][0],
+            ValueList::Value(Value::Identifier(Rc::new("+".into())))
+        );
+        assert_eq!(
+            value_list[0][3][1],
+            ValueList::Value(Value::Identifier(Rc::new("a".into())))
+        );
+        assert_eq!(
+            value_list[0][3][2],
+            ValueList::Value(Value::Identifier(Rc::new("b".into())))
+        );
     }
 }

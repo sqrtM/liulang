@@ -143,16 +143,15 @@ impl<'a> Iterator for LineToTokenize<'a> {
         let mut chars = self.line.char_indices();
         let (_, curr_char) = chars.next()?;
 
-        let next = chars.find(|(_, c)| token_should_end(curr_char, *c)).map_or(
-            self.line.len(),
-            |(i, next_char)| {
+        let next = chars
+            .find(|(_, next_char)| token_should_end(curr_char, *next_char))
+            .map_or(self.line.len(), |(i, next_char)| {
                 if curr_char == '(' && next_char == ')' {
                     i + 1
                 } else {
                     i
                 }
-            },
-        );
+            });
 
         let (token, rest) = self.line.split_at(next);
 
