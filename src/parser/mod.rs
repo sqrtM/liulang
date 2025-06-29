@@ -90,7 +90,8 @@ pub(crate) fn parse(listed_values: ValueList, mut symbols: Vec<String>) -> (Node
                     // This is kind of hokey and hard to get right. Checking for a valid operator
                     // during this phase makes it difficult to know what new operators will be
                     // added. Try and make this a bit more elegant.
-                    if node.get_operator() == Value::Unit && is_valid_operator(identifier) {
+                    if node.get_operator() == Value::Unit && is_valid_operator(identifier, &symbols)
+                    {
                         node.set_operator(Value::Identifier(identifier.clone()))
                     } else {
                         node.push_operand(Operand::Value(Value::Identifier(identifier.clone())))
@@ -109,20 +110,16 @@ pub(crate) fn parse(listed_values: ValueList, mut symbols: Vec<String>) -> (Node
             _ => todo!(),
         };
     }
-    // ... maybe a thing where, before we send the node back, we say: "was this a
-    // def node ? did it have arguments ?" if yes, add it to a global function table,
-    // so it will henceforth it will be considered as a valid operator.
-
-    println!("{symbols:?}");
     (node.clone(), find_operator(&node))
 }
 
-fn is_valid_operator(op: &str) -> bool {
-    matches!(op, "+" | "def")
+fn is_valid_operator(op: &str, symbols: &[String]) -> bool {
+    matches!(op, "+" | "-" | "def") || symbols.iter().any(|s| s == op)
 }
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
     use std::rc::Rc;
 
     use super::*;
@@ -188,5 +185,106 @@ mod tests {
                 ]
             }))
         );
+    }
+
+    #[test]
+    fn test_parsing_def_scope() {
+        // Defs should fall out of scope.
+        let list = ValueList::List(vec![
+            ValueList::List(vec![
+                ValueList::List(vec![
+                    ValueList::Value(Value::Identifier(Rc::new("def".into()))),
+                    ValueList::Value(Value::Identifier(Rc::new("add".into()))),
+                    ValueList::List(vec![
+                        ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                        ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                    ]),
+                    ValueList::List(vec![
+                        ValueList::Value(Value::Identifier(Rc::new("+".into()))),
+                        ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                        ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                    ]),
+                ]),
+                ValueList::List(vec![
+                    ValueList::Value(Value::Identifier(Rc::new("add".into()))), // Should be an operator
+                    ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                    ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                ]),
+            ]),
+            ValueList::List(vec![
+                ValueList::List(vec![
+                    ValueList::Value(Value::Identifier(Rc::new("def".into()))),
+                    ValueList::Value(Value::Identifier(Rc::new("sub".into()))),
+                    ValueList::List(vec![
+                        ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                        ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                    ]),
+                    ValueList::List(vec![
+                        ValueList::Value(Value::Identifier(Rc::new("-".into()))),
+                        ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                        ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                    ]),
+                ]),
+                ValueList::List(vec![
+                    ValueList::Value(Value::Identifier(Rc::new("add".into()))), // Should not be an operator
+                    ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                    ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                ]),
+                ValueList::List(vec![
+                    ValueList::Value(Value::Identifier(Rc::new("sub".into()))), // Should be an operator
+                    ValueList::Value(Value::Identifier(Rc::new("a".into()))),
+                    ValueList::Value(Value::Identifier(Rc::new("b".into()))),
+                ]),
+            ]),
+        ]);
+
+        let (node, _) = parse(list, Vec::new());
+
+        assert_eq!(node.get_operands().len(), 2);
+
+        // Test first operand set
+        match &node.get_operands()[0] {
+            Operand::Value(value) => panic!("Should not be a value. Got {value:?}"),
+            Operand::Node(inner_node) => {
+                assert_eq!(inner_node.get_operands().len(), 2);
+                assert_eq!(
+                    inner_node.get_operands()[1],
+                    Operand::Node(Node::Operation(OperationNode {
+                        operator: Value::Identifier(Rc::new("add".into())),
+                        operands: vec![
+                            Operand::Value(Value::Identifier(Rc::new("a".into()))),
+                            Operand::Value(Value::Identifier(Rc::new("b".into())))
+                        ]
+                    }))
+                );
+            }
+        };
+
+        // Test second operand set
+        match &node.get_operands()[1] {
+            Operand::Value(value) => panic!("Should not be a value. Got {value:?}"),
+            Operand::Node(inner_node) => {
+                assert_eq!(inner_node.get_operands().len(), 3);
+                assert_eq!(
+                    inner_node.get_operands()[1],
+                    Operand::Node(Node::List(vec![
+                        // This becomes a list because operator is out of scope.
+                        Operand::Value(Value::Identifier(Rc::new("add".into()))),
+                        Operand::Value(Value::Identifier(Rc::new("a".into()))),
+                        Operand::Value(Value::Identifier(Rc::new("b".into())))
+                    ]))
+                );
+                assert_eq!(
+                    inner_node.get_operands()[2],
+                    Operand::Node(Node::Operation(OperationNode {
+                        operator: Value::Identifier(Rc::new("sub".into())),
+                        operands: vec![
+                            Operand::Value(Value::Identifier(Rc::new("a".into()))),
+                            Operand::Value(Value::Identifier(Rc::new("b".into())))
+                        ]
+                    }))
+                );
+            }
+        };
     }
 }
