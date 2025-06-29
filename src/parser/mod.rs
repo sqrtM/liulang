@@ -82,7 +82,7 @@ pub enum Operand {
 /// relationships across all other expressions.
 pub(crate) fn parse(listed_values: ValueList, mut symbols: Vec<String>) -> (Node, Option<String>) {
     let mut node = Node::default();
-    for inner_value in &listed_values.unravel() {
+    for inner_value in listed_values.unravel() {
         node = match inner_value {
             ValueList::Value(value) => match value {
                 Value::Int(int) => node.push_operand(Operand::Value(Value::Int(*int))),
